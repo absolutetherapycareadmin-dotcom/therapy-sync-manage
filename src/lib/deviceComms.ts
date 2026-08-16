@@ -58,7 +58,7 @@ export type DeviceCapabilities = {
   smsGranted: boolean;
   callGranted: boolean;
   telephony: boolean;
-  reason?: string;
+  reason?: string | undefined;
 };
 
 export async function deviceCapabilities(): Promise<DeviceCapabilities> {
