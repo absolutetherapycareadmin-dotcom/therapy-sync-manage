@@ -1,0 +1,156 @@
+name: Therapy Care Android
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  CAP_SERVER_URL: ${{ vars.CAP_SERVER_URL }}
+
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate production endpoint
+        run: |
+          if [ -z "$CAP_SERVER_URL" ]; then
+            echo "CAP_SERVER_URL repository variable is required."
+            echo "The Android wrapper must point only to the deployed HTTPS Therapy Care application."
+            exit 1
+          fi
+          case "$CAP_SERVER_URL" in
+            https://*) ;;
+            *) echo "CAP_SERVER_URL must use HTTPS."; exit 1 ;;
+          esac
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Add Android platform
+        run: npx cap add android
+
+      - name: Configure secure Android WebView shell
+        shell: bash
+        run: |
+          MAIN="android/app/src/main/java/com/therapycare/app/MainActivity.java"
+          mkdir -p "$(dirname "$MAIN")"
+          cat > "$MAIN" <<'JAVA'
+          package com.therapycare.app;
+
+          import android.os.Bundle;
+          import android.view.WindowManager;
+          import android.webkit.WebView;
+
+          import com.getcapacitor.BridgeActivity;
+
+          public class MainActivity extends BridgeActivity {
+            @Override
+            protected void onCreate(Bundle savedInstanceState) {
+              super.onCreate(savedInstanceState);
+              getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+              getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+              WebView.setWebContentsDebuggingEnabled(false);
+            }
+          }
+          JAVA
+
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          python3 - "$MANIFEST" <<'PY'
+          from pathlib import Path
+          import re
+          p = Path(__import__('sys').argv[1])
+          s = p.read_text()
+          s = re.sub(r'<application\b([^>]*)>', lambda m: '<application' + m.group(1) + ' android:allowBackup="false" android:fullBackupContent="false" android:usesCleartextTraffic="false">', s, count=1)
+          p.write_text(s)
+          PY
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Lint web application
+        run: npm run lint
+
+      - name: Build debug APK and AAB
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug bundleDebug
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: therapy-care-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload debug AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: therapy-care-debug-aab
+          path: android/app/build/outputs/bundle/debug/app-debug.aab
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Prepare release signing key
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: echo "$KEYSTORE_B64" | base64 --decode > therapy-care-release.jks
+
+      - name: Build signed release APK and AAB
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '' }}
+        working-directory: android
+        env:
+          KEYSTORE_PATH: ${{ github.workspace }}/therapy-care-release.jks
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          ./gradlew --no-daemon assembleRelease bundleRelease \
+            -Pandroid.injected.signing.store.file="$KEYSTORE_PATH" \
+            -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
+            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
+
+      - name: Upload signed release APK
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: therapy-care-release-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload signed release AAB
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: therapy-care-release-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 30
