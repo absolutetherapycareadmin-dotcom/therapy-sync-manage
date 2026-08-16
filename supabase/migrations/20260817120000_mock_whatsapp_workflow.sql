@@ -46,7 +46,7 @@ BEGIN
     to_char(NEW.start_time, 'HH12:MI AM'),
     COALESCE(t.full_name, 'Not assigned'),
     COALESCE(NEW.specialty, 'Therapy session'),
-    COALESCE((SELECT name FROM public.rooms WHERE id = NEW.room_id AND clinic_id = NEW.clinic_id), 'Not assigned'),
+    COALESCE((SELECT r.name FROM public.rooms r WHERE r.id = NEW.room_id AND r.clinic_id = NEW.clinic_id), 'Not assigned'),
     COALESCE(NEW.session_fee::text, 'To be confirmed')
   );
 
@@ -92,20 +92,21 @@ DECLARE
   a public.appointments%ROWTYPE;
   c public.children%ROWTYPE;
   t public.therapists%ROWTYPE;
-  clinic_id uuid;
+  v_clinic_id uuid;
   next_status text;
   action_label text;
+  therapist_notified boolean := false;
 BEGIN
-  SELECT public.current_clinic_id() INTO clinic_id;
-  IF clinic_id IS NULL THEN
-    RAISE EXCEPTION 'Not authenticated';
+  SELECT p.clinic_id INTO v_clinic_id FROM public.profiles p WHERE p.id = auth.uid();
+  IF v_clinic_id IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated or no clinic assigned';
   END IF;
 
-  SELECT * INTO a FROM public.appointments WHERE id = p_appointment_id AND public.appointments.clinic_id = clinic_id;
+  SELECT * INTO a FROM public.appointments WHERE id = p_appointment_id AND public.appointments.clinic_id = v_clinic_id;
   IF a.id IS NULL THEN RAISE EXCEPTION 'Appointment not found'; END IF;
 
-  SELECT * INTO c FROM public.children WHERE id = a.child_id AND public.children.clinic_id = clinic_id;
-  SELECT * INTO t FROM public.therapists WHERE id = a.therapist_id AND public.therapists.clinic_id = clinic_id;
+  SELECT * INTO c FROM public.children WHERE id = a.child_id AND public.children.clinic_id = v_clinic_id;
+  SELECT * INTO t FROM public.therapists WHERE id = a.therapist_id AND public.therapists.clinic_id = v_clinic_id;
 
   IF p_action = 'confirm_appointment' THEN
     next_status := 'confirmed';
@@ -138,25 +139,26 @@ BEGIN
       clinic_id, child_id, appointment_id, recipient_name, phone, message,
       message_type, recipient_role, status, metadata, sent_at
     ) VALUES (
-      clinic_id, a.child_id, a.id, t.full_name, trim(t.phone),
+      v_clinic_id, a.child_id, a.id, t.full_name, trim(t.phone),
       format('Therapy Care – Appointment Confirmed\n\n%s''s parent has confirmed the appointment.\n\nDate: %s\nTime: %s\nTherapy: %s\nRoom: %s',
         c.full_name, a.appointment_date, to_char(a.start_time, 'HH12:MI AM'),
         COALESCE(a.specialty, 'Therapy session'),
-        COALESCE((SELECT name FROM public.rooms WHERE id = a.room_id AND clinic_id = clinic_id), 'Not assigned')),
+        COALESCE((SELECT r.name FROM public.rooms r WHERE r.id = a.room_id AND r.clinic_id = v_clinic_id), 'Not assigned')),
       'appointment_confirmed', 'therapist', 'mocked',
       jsonb_build_object('mode', 'mock', 'trigger', 'parent_confirmation'), now()
     );
+    therapist_notified := true;
   END IF;
 
   INSERT INTO public.notifications (clinic_id, title, body, type)
   VALUES (
-    clinic_id,
+    v_clinic_id,
     CASE WHEN p_action = 'confirm_appointment' THEN 'Parent confirmed appointment' ELSE 'Parent ' || action_label END,
     format('%s: %s on %s at %s.', c.full_name, action_label, a.appointment_date, to_char(a.start_time, 'HH12:MI AM')),
     'appointment_parent_action'
   );
 
-  RETURN jsonb_build_object('ok', true, 'appointment_id', a.id, 'status', next_status, 'therapist_notified', p_action = 'confirm_appointment' AND t.id IS NOT NULL AND t.phone IS NOT NULL);
+  RETURN jsonb_build_object('ok', true, 'appointment_id', a.id, 'status', next_status, 'therapist_notified', therapist_notified);
 END;
 $$;
 
