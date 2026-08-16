@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import type { CallQueueRow, SmsQueueRow } from "@/lib/deviceComms";
 
 export type Child = {
   id: string;
@@ -92,10 +93,8 @@ export type WhatsappMessage = {
   message_type: string;
   recipient_role: string;
   status: string;
-  provider_message_id: string | null;
   delivered_at: string | null;
   read_at: string | null;
-  error_code: string | null;
   error_message: string | null;
   metadata: Record<string, unknown> | null;
   sent_at: string | null;
@@ -179,4 +178,14 @@ export const attendanceQuery = (clinicId: string) => ({
 export const notificationsQuery = (clinicId: string) => ({
   queryKey: ["notifications", clinicId],
   queryFn: () => list<NotificationRow>("notifications", clinicId, "created_at", false),
+});
+
+export const smsQueueQuery = (clinicId: string) => ({
+  queryKey: ["sms_queue", clinicId],
+  queryFn: () => list<SmsQueueRow>("sms_queue", clinicId, "scheduled_for", false),
+});
+
+export const callQueueQuery = (clinicId: string) => ({
+  queryKey: ["call_queue", clinicId],
+  queryFn: () => list<CallQueueRow>("call_queue", clinicId, "scheduled_for", false),
 });
