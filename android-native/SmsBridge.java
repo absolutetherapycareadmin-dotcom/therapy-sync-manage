@@ -1,6 +1,10 @@
 package com.therapycare.app;
 
 import android.Manifest;
+import android.app.AlarmManager;
+import android.app.PendingIntent;
+import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.telephony.SmsManager;
 import android.telephony.SubscriptionInfo;
@@ -18,19 +22,22 @@ import java.util.List;
 })
 public class SmsBridge extends Plugin {
   @PluginMethod
-  public void send(PluginCall call) {
+  public void send(PluginCall call) { sendNow(call.getString("phone", ""), call.getString("message", ""), call); }
+
+  @PluginMethod
+  public void schedule(PluginCall call) {
     String phone = call.getString("phone", "");
     String message = call.getString("message", "");
-    if (phone.isBlank() || message.isBlank()) { call.reject("phone and message are required"); return; }
-    if (getContext().checkSelfPermission(Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
-      requestPermissionForAlias("sms", call, "smsPermission"); return;
-    }
-    try {
-      SmsManager manager = getSmsManager();
-      List<String> parts = manager.divideMessage(message);
-      manager.sendMultipartTextMessage(phone, null, parts, null, null);
-      JSObject result = new JSObject(); result.put("queued", true); result.put("phone", phone); call.resolve(result);
-    } catch (Exception e) { call.reject("SMS send failed: " + e.getMessage(), e); }
+    long at = call.getLong("atEpochMs", 0L);
+    if (phone.isBlank() || message.isBlank() || at <= System.currentTimeMillis()) { call.reject("phone, message and a future atEpochMs are required"); return; }
+    if (getContext().checkSelfPermission(Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) { requestPermissionForAlias("sms", call, "smsPermission"); return; }
+    Intent intent = new Intent(getContext(), SmsAlarmReceiver.class).setAction(SmsAlarmReceiver.ACTION_SEND_SMS)
+      .putExtra(SmsAlarmReceiver.EXTRA_PHONE, phone).putExtra(SmsAlarmReceiver.EXTRA_MESSAGE, message);
+    int requestCode = Math.abs((phone + at).hashCode());
+    PendingIntent pi = PendingIntent.getBroadcast(getContext(), requestCode, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    AlarmManager alarm = (AlarmManager) getContext().getSystemService(Context.ALARM_SERVICE);
+    alarm.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi);
+    JSObject result = new JSObject(); result.put("scheduled", true); result.put("atEpochMs", at); result.put("requestCode", requestCode); call.resolve(result);
   }
 
   @PluginMethod
@@ -43,6 +50,17 @@ public class SmsBridge extends Plugin {
 
   @PluginMethod
   public void requestPermission(PluginCall call) { requestPermissionForAlias("sms", call, "smsPermission"); }
+
+  private void sendNow(String phone, String message, PluginCall call) {
+    if (phone.isBlank() || message.isBlank()) { call.reject("phone and message are required"); return; }
+    if (getContext().checkSelfPermission(Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) { requestPermissionForAlias("sms", call, "smsPermission"); return; }
+    try {
+      SmsManager manager = getSmsManager();
+      List<String> parts = manager.divideMessage(message);
+      manager.sendMultipartTextMessage(phone, null, parts, null, null);
+      JSObject result = new JSObject(); result.put("queued", true); result.put("phone", phone); call.resolve(result);
+    } catch (Exception e) { call.reject("SMS send failed: " + e.getMessage(), e); }
+  }
 
   private SmsManager getSmsManager() {
     SubscriptionManager sm = (SubscriptionManager) getContext().getSystemService(SubscriptionManager.class);
