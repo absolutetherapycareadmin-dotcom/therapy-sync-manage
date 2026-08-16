@@ -1,0 +1,11 @@
+<!-- Merge into the Capacitor Android manifest during native build. SEND_SMS is runtime-dangerous. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <uses-feature android:name="android.hardware.telephony.messaging" android:required="false" />
+  <uses-permission android:name="android.permission.SEND_SMS" />
+  <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+  <application>
+    <receiver
+      android:name="com.therapycare.app.SmsAlarmReceiver"
+      android:exported="false" />
+  </application>
+</manifest>
