@@ -53,6 +53,9 @@ export type Appointment = {
   duration_minutes: number;
   session_fee: number | null;
   status: string;
+  parent_confirmation_status: string;
+  parent_action_at: string | null;
+  parent_action_note: string | null;
   notes: string | null;
   recurrence_group_id: string | null;
 };
@@ -82,11 +85,19 @@ export type PackageRow = {
 export type WhatsappMessage = {
   id: string;
   child_id: string | null;
+  appointment_id: string | null;
   recipient_name: string | null;
   phone: string;
   message: string;
   message_type: string;
+  recipient_role: string;
   status: string;
+  provider_message_id: string | null;
+  delivered_at: string | null;
+  read_at: string | null;
+  error_code: string | null;
+  error_message: string | null;
+  metadata: Record<string, unknown> | null;
   sent_at: string | null;
   created_at: string;
 };
