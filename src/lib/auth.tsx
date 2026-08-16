@@ -19,7 +19,14 @@ export type Clinic = {
   address: string | null;
   city: string | null;
   currency: string;
+  timezone?: string | null;
+  device_phone?: string | null;
+  device_label?: string | null;
+  sms_enabled?: boolean;
+  call_enabled?: boolean;
+  reminder_lead_minutes?: number;
 };
+
 
 type AuthContextValue = {
   loading: boolean;
