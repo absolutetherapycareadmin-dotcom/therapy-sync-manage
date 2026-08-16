@@ -6,7 +6,7 @@
 
 /*
  * Therapy Care design system.
- * Calm clinical teal + warm neutrals. All colors are oklch tokens.
+ * Calm clinical pink + warm neutrals. All colors are oklch tokens.
  */
 
 @theme inline {
@@ -68,14 +68,14 @@
   --card-foreground: oklch(0.23 0.02 210);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.23 0.02 210);
-  --primary: oklch(0.52 0.088 190);
-  --primary-foreground: oklch(0.99 0.005 190);
-  --secondary: oklch(0.955 0.012 190);
-  --secondary-foreground: oklch(0.32 0.035 200);
+  --primary: oklch(0.65 0.2 350);
+  --primary-foreground: oklch(0.99 0.005 350);
+  --secondary: oklch(0.955 0.035 350);
+  --secondary-foreground: oklch(0.32 0.08 350);
   --muted: oklch(0.96 0.008 195);
   --muted-foreground: oklch(0.52 0.018 210);
-  --accent: oklch(0.94 0.03 185);
-  --accent-foreground: oklch(0.33 0.05 195);
+  --accent: oklch(0.94 0.045 350);
+  --accent-foreground: oklch(0.33 0.09 350);
   --destructive: oklch(0.57 0.2 22);
   --destructive-foreground: oklch(0.99 0.004 20);
   --success: oklch(0.58 0.12 155);
@@ -86,20 +86,20 @@
   --info-foreground: oklch(0.99 0.004 245);
   --border: oklch(0.9 0.01 200);
   --input: oklch(0.9 0.01 200);
-  --ring: oklch(0.52 0.088 190);
-  --chart-1: oklch(0.52 0.088 190);
+  --ring: oklch(0.65 0.2 350);
+  --chart-1: oklch(0.65 0.2 350);
   --chart-2: oklch(0.58 0.12 155);
   --chart-3: oklch(0.72 0.14 75);
   --chart-4: oklch(0.58 0.11 245);
   --chart-5: oklch(0.57 0.2 22);
   --sidebar: oklch(0.99 0.005 190);
   --sidebar-foreground: oklch(0.3 0.02 210);
-  --sidebar-primary: oklch(0.52 0.088 190);
-  --sidebar-primary-foreground: oklch(0.99 0.005 190);
-  --sidebar-accent: oklch(0.95 0.02 188);
-  --sidebar-accent-foreground: oklch(0.33 0.05 195);
+  --sidebar-primary: oklch(0.65 0.2 350);
+  --sidebar-primary-foreground: oklch(0.99 0.005 350);
+  --sidebar-accent: oklch(0.95 0.03 350);
+  --sidebar-accent-foreground: oklch(0.33 0.08 350);
   --sidebar-border: oklch(0.92 0.01 200);
-  --sidebar-ring: oklch(0.52 0.088 190);
+  --sidebar-ring: oklch(0.65 0.2 350);
 }
 
 .dark {
@@ -109,13 +109,13 @@
   --card-foreground: oklch(0.96 0.005 195);
   --popover: oklch(0.23 0.022 215);
   --popover-foreground: oklch(0.96 0.005 195);
-  --primary: oklch(0.68 0.1 185);
+  --primary: oklch(0.72 0.16 350);
   --primary-foreground: oklch(0.19 0.02 215);
-  --secondary: oklch(0.28 0.025 215);
+  --secondary: oklch(0.28 0.04 350);
   --secondary-foreground: oklch(0.96 0.005 195);
   --muted: oklch(0.28 0.025 215);
   --muted-foreground: oklch(0.7 0.015 205);
-  --accent: oklch(0.32 0.04 195);
+  --accent: oklch(0.32 0.055 350);
   --accent-foreground: oklch(0.96 0.005 195);
   --destructive: oklch(0.65 0.18 22);
   --destructive-foreground: oklch(0.99 0.004 20);
@@ -124,23 +124,23 @@
   --warning: oklch(0.78 0.14 75);
   --warning-foreground: oklch(0.19 0.02 215);
   --info: oklch(0.68 0.11 245);
-  --info-foreground: oklch(0.19 0.02 215);
+  --info-foreground: oklch(0.99 0.004 245);
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 16%);
-  --ring: oklch(0.68 0.1 185);
-  --chart-1: oklch(0.68 0.1 185);
+  --ring: oklch(0.72 0.16 350);
+  --chart-1: oklch(0.72 0.16 350);
   --chart-2: oklch(0.68 0.13 155);
   --chart-3: oklch(0.78 0.14 75);
   --chart-4: oklch(0.68 0.11 245);
   --chart-5: oklch(0.65 0.18 22);
   --sidebar: oklch(0.22 0.022 215);
   --sidebar-foreground: oklch(0.94 0.005 195);
-  --sidebar-primary: oklch(0.68 0.1 185);
+  --sidebar-primary: oklch(0.72 0.16 350);
   --sidebar-primary-foreground: oklch(0.19 0.02 215);
-  --sidebar-accent: oklch(0.3 0.035 195);
+  --sidebar-accent: oklch(0.3 0.05 350);
   --sidebar-accent-foreground: oklch(0.96 0.005 195);
   --sidebar-border: oklch(1 0 0 / 12%);
-  --sidebar-ring: oklch(0.68 0.1 185);
+  --sidebar-ring: oklch(0.72 0.16 350);
 }
 
 @layer base {
