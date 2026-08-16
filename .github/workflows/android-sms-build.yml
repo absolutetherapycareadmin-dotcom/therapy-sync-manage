@@ -1,0 +1,65 @@
+name: Android SMS Build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  android-sms:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web app
+        run: npm run build
+
+      - name: Generate Capacitor Android project
+        run: npx cap add android
+
+      - name: Sync web assets
+        run: npx cap copy android
+
+      - name: Install native SMS bridge
+        run: |
+          mkdir -p android/app/src/main/java/com/therapycare/app
+          cp android-native/SmsBridge.java android/app/src/main/java/com/therapycare/app/SmsBridge.java
+          cp android-native/SmsAlarmReceiver.java android/app/src/main/java/com/therapycare/app/SmsAlarmReceiver.java
+          cp android-native/MainActivity.java android/app/src/main/java/com/therapycare/app/MainActivity.java
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('android/app/src/main/AndroidManifest.xml')
+          s = p.read_text()
+          s = s.replace('<manifest ', '<manifest xmlns:android="http://schemas.android.com/apk/res/android" ', 1) if 'xmlns:android=' not in s else s
+          marker = '<application'
+          additions = '''  <uses-feature android:name="android.hardware.telephony.messaging" android:required="false" />\n  <uses-permission android:name="android.permission.SEND_SMS" />\n  <uses-permission android:name="android.permission.READ_PHONE_STATE" />\n'''
+          if 'android.permission.SEND_SMS' not in s:
+              s = s.replace(marker, additions + marker, 1)
+          receiver = '''    <receiver android:name="com.therapycare.app.SmsAlarmReceiver" android:exported="false" />\n'''
+          if 'SmsAlarmReceiver' not in s:
+              s = s.replace('</application>', receiver + '  </application>', 1)
+          p.write_text(s)
+          PY
+
+      - name: Assemble debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: therapy-care-sms-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
