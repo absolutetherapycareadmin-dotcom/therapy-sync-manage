@@ -204,6 +204,9 @@ function SettingsPage() {
         )}
       </section>
 
+      <CommunicationDeviceSection />
+
+
       <section className="rounded-xl border bg-card p-5">
         <h2 className="text-sm font-semibold">Account</h2>
         <p className="mt-1 text-sm text-muted-foreground">
