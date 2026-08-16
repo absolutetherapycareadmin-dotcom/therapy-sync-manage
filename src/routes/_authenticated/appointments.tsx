@@ -166,7 +166,8 @@ function AppointmentsPage() {
           throw new Error("End date cannot be before the start date");
 
         const groupId = crypto.randomUUID();
-        const rows: Array<Record<string, unknown>> = [];
+        const rows: Array<typeof base & { appointment_date: string; recurrence_group_id: string }> =
+          [];
         const cursor = new Date(`${form.appointment_date}T00:00:00`);
         const end = new Date(`${form.recurrence_end}T00:00:00`);
         while (cursor <= end && rows.length < 200) {
