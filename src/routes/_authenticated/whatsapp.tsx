@@ -43,9 +43,9 @@ export const Route = createFileRoute("/_authenticated/whatsapp")({
   head: () => ({
     meta: [
       { title: "WhatsApp Centre — Therapy Care" },
-      { name: "description", content: "Compose and log WhatsApp messages sent to parents." },
+      { name: "description", content: "Compose and log WhatsApp messages sent to parents and therapists." },
       { property: "og:title", content: "WhatsApp Centre — Therapy Care" },
-      { property: "og:description", content: "Compose and log WhatsApp messages to parents." },
+      { property: "og:description", content: "Compose and log WhatsApp messages to parents and therapists." },
     ],
   }),
   component: WhatsappPage,
@@ -53,6 +53,20 @@ export const Route = createFileRoute("/_authenticated/whatsapp")({
 
 const NONE = "__none__";
 const TYPES = ["reminder", "confirmation", "payment", "general"];
+
+type RpcResult = { data: unknown; error: { message: string } | null };
+
+function callMockParentAction(appointmentId: string, action: string, note?: string) {
+  const rpc = supabase.rpc as unknown as (
+    fn: string,
+    args: Record<string, unknown>,
+  ) => Promise<RpcResult>;
+  return rpc("process_mock_parent_action", {
+    p_appointment_id: appointmentId,
+    p_action: action,
+    p_note: note ?? null,
+  });
+}
 
 function WhatsappPage() {
   const { clinicId } = useAuth();
@@ -84,8 +98,10 @@ function WhatsappPage() {
         phone,
         message: form.message.trim(),
         message_type: form.message_type,
-        status: "sent",
+        status: "manual_opened",
         sent_at: new Date().toISOString(),
+        recipient_role: "parent",
+        metadata: { mode: "manual", note: "WhatsApp app opened by user" },
       });
       if (error) throw error;
 
@@ -96,7 +112,7 @@ function WhatsappPage() {
       );
     },
     onSuccess: () => {
-      toast.success("Message logged and opened in WhatsApp");
+      toast.success("Message logged and WhatsApp opened");
       setOpen(false);
       setForm({
         child_id: NONE,
@@ -110,13 +126,26 @@ function WhatsappPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const mockAction = useMutation({
+    mutationFn: async ({ appointmentId, action }: { appointmentId: string; action: string }) => {
+      const { error } = await callMockParentAction(appointmentId, action);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: (_, variables) => {
+      const label = variables.action === "confirm_appointment" ? "confirmed" : variables.action === "cancel_appointment" ? "cancellation requested" : "reschedule requested";
+      toast.success(`Mock parent response: ${label}`);
+      void qc.invalidateQueries({ queryKey: ["whatsapp_messages", id] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const rows = messages.data ?? [];
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="WhatsApp Centre"
-        description="Compose parent messages and keep a record of every conversation."
+        description="Compose messages and keep a record of parent and therapist WhatsApp automation."
         actions={
           <Button onClick={() => setOpen(true)}>
             <Send className="size-4" />
@@ -125,13 +154,17 @@ function WhatsappPage() {
         }
       />
 
+      <div className="rounded-xl border border-dashed bg-card p-4 text-sm text-muted-foreground">
+        <strong className="text-foreground">₹0 test mode:</strong> appointment confirmations are logged without sending a real WhatsApp message. Use the mock response buttons on a parent confirmation to test Confirm, Cancel and Reschedule. A confirmed appointment automatically queues the assigned therapist notification.
+      </div>
+
       {messages.isLoading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : rows.length === 0 ? (
         <EmptyState
           icon={MessageCircle}
           title="No messages yet"
-          description="Send session reminders or payment follow-ups to parents; each one is logged here."
+          description="Book an appointment to create its automatic parent confirmation in test mode."
           action={
             <Button onClick={() => setOpen(true)}>
               <Send className="size-4" />
@@ -148,14 +181,15 @@ function WhatsappPage() {
                 <TableHead className="hidden sm:table-cell">Phone</TableHead>
                 <TableHead>Message</TableHead>
                 <TableHead className="hidden md:table-cell">Type</TableHead>
-                <TableHead className="text-right">Status</TableHead>
+                <TableHead className="hidden lg:table-cell">Role</TableHead>
+                <TableHead className="text-right">Status / Test</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.map((m) => (
                 <TableRow key={m.id}>
                   <TableCell className="font-medium">
-                    {m.recipient_name ?? "Parent"}
+                    {m.recipient_name ?? (m.recipient_role === "therapist" ? "Therapist" : "Parent")}
                     <span className="block text-xs text-muted-foreground">
                       {formatDate(m.created_at)}
                     </span>
@@ -165,10 +199,50 @@ function WhatsappPage() {
                     {m.message}
                   </TableCell>
                   <TableCell className="hidden md:table-cell capitalize">
-                    {m.message_type}
+                    {m.message_type.replaceAll("_", " ")}
                   </TableCell>
+                  <TableCell className="hidden lg:table-cell capitalize">{m.recipient_role}</TableCell>
                   <TableCell className="text-right">
-                    <StatusBadge status={m.status} />
+                    <div className="flex flex-col items-end gap-2">
+                      <StatusBadge status={m.status} />
+                      {m.recipient_role === "parent" &&
+                      m.message_type === "appointment_confirmation" &&
+                      m.appointment_id &&
+                      m.status === "mocked" ? (
+                        <div className="flex flex-wrap justify-end gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={mockAction.isPending}
+                            onClick={() =>
+                              mockAction.mutate({ appointmentId: m.appointment_id!, action: "confirm_appointment" })
+                            }
+                          >
+                            Confirm
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={mockAction.isPending}
+                            onClick={() =>
+                              mockAction.mutate({ appointmentId: m.appointment_id!, action: "cancel_appointment" })
+                            }
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={mockAction.isPending}
+                            onClick={() =>
+                              mockAction.mutate({ appointmentId: m.appointment_id!, action: "reschedule_appointment" })
+                            }
+                          >
+                            Reschedule
+                          </Button>
+                        </div>
+                      ) : null}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -182,7 +256,7 @@ function WhatsappPage() {
           <DialogHeader>
             <DialogTitle>New WhatsApp message</DialogTitle>
             <DialogDescription>
-              The message is logged here and opened in WhatsApp for sending.
+              This manual action opens WhatsApp. It does not claim the message was delivered.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
