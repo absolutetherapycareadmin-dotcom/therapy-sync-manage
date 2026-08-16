@@ -5,7 +5,7 @@ const serverUrl = process.env.CAP_SERVER_URL?.trim();
 const config: CapacitorConfig = {
   appId: "com.therapycare.app",
   appName: "Therapy Care",
-  webDir: "public",
+  webDir: "android-shell",
   android: {
     backgroundColor: "#ffffff",
   },
