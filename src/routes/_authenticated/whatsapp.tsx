@@ -100,8 +100,6 @@ function WhatsappPage() {
         message_type: form.message_type,
         status: "manual_opened",
         sent_at: new Date().toISOString(),
-        recipient_role: "parent",
-        metadata: { mode: "manual", note: "WhatsApp app opened by user" },
       });
       if (error) throw error;
 
