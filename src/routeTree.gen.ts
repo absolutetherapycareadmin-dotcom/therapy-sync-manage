@@ -21,6 +21,7 @@ import { Route as AuthenticatedPackagesRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedPaymentsRouteImport } from './routes/_authenticated/payments'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
 import { Route as AuthenticatedRoomsRouteImport } from './routes/_authenticated/rooms'
+import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedTherapistsRouteImport } from './routes/_authenticated/therapists'
 import { Route as AuthenticatedWhatsappRouteImport } from './routes/_authenticated/whatsapp'
 import { Route as AuthenticatedChildrenIndexRouteImport } from './routes/_authenticated/children.index'
@@ -87,6 +88,11 @@ const AuthenticatedRoomsRoute = AuthenticatedRoomsRouteImport.update({
   path: '/rooms',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedTherapistsRoute = AuthenticatedTherapistsRouteImport.update({
   id: '/therapists',
   path: '/therapists',
@@ -122,6 +128,7 @@ export interface FileRoutesByFullPath {
   '/payments': typeof AuthenticatedPaymentsRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/rooms': typeof AuthenticatedRoomsRoute
+  '/settings': typeof AuthenticatedSettingsRoute
   '/therapists': typeof AuthenticatedTherapistsRoute
   '/whatsapp': typeof AuthenticatedWhatsappRoute
   '/children/$childId': typeof AuthenticatedChildrenChildIdRoute
@@ -139,6 +146,7 @@ export interface FileRoutesByTo {
   '/payments': typeof AuthenticatedPaymentsRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/rooms': typeof AuthenticatedRoomsRoute
+  '/settings': typeof AuthenticatedSettingsRoute
   '/therapists': typeof AuthenticatedTherapistsRoute
   '/whatsapp': typeof AuthenticatedWhatsappRoute
   '/children/$childId': typeof AuthenticatedChildrenChildIdRoute
@@ -158,6 +166,7 @@ export interface FileRoutesById {
   '/_authenticated/payments': typeof AuthenticatedPaymentsRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/rooms': typeof AuthenticatedRoomsRoute
+  '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/therapists': typeof AuthenticatedTherapistsRoute
   '/_authenticated/whatsapp': typeof AuthenticatedWhatsappRoute
   '/_authenticated/children/$childId': typeof AuthenticatedChildrenChildIdRoute
@@ -177,6 +186,7 @@ export interface FileRouteTypes {
     | '/payments'
     | '/reports'
     | '/rooms'
+    | '/settings'
     | '/therapists'
     | '/whatsapp'
     | '/children/$childId'
@@ -194,6 +204,7 @@ export interface FileRouteTypes {
     | '/payments'
     | '/reports'
     | '/rooms'
+    | '/settings'
     | '/therapists'
     | '/whatsapp'
     | '/children/$childId'
@@ -212,6 +223,7 @@ export interface FileRouteTypes {
     | '/_authenticated/payments'
     | '/_authenticated/reports'
     | '/_authenticated/rooms'
+    | '/_authenticated/settings'
     | '/_authenticated/therapists'
     | '/_authenticated/whatsapp'
     | '/_authenticated/children/$childId'
@@ -311,6 +323,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRoomsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/therapists': {
       id: '/_authenticated/therapists'
       path: '/therapists'
@@ -351,6 +370,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPaymentsRoute: typeof AuthenticatedPaymentsRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
   AuthenticatedRoomsRoute: typeof AuthenticatedRoomsRoute
+  AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedTherapistsRoute: typeof AuthenticatedTherapistsRoute
   AuthenticatedWhatsappRoute: typeof AuthenticatedWhatsappRoute
   AuthenticatedChildrenChildIdRoute: typeof AuthenticatedChildrenChildIdRoute
@@ -366,6 +386,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedPaymentsRoute: AuthenticatedPaymentsRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
   AuthenticatedRoomsRoute: AuthenticatedRoomsRoute,
+  AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedTherapistsRoute: AuthenticatedTherapistsRoute,
   AuthenticatedWhatsappRoute: AuthenticatedWhatsappRoute,
   AuthenticatedChildrenChildIdRoute: AuthenticatedChildrenChildIdRoute,
