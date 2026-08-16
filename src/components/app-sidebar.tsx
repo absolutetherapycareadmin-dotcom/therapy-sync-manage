@@ -9,6 +9,8 @@ import {
   Package,
   IndianRupee,
   MessageCircle,
+  PhoneCall,
+
   Bell,
   BarChart3,
   Settings,
@@ -46,6 +48,8 @@ const groups = [
       { title: "Packages", url: "/packages", icon: Package },
       { title: "Payments", url: "/payments", icon: IndianRupee },
       { title: "WhatsApp Centre", url: "/whatsapp", icon: MessageCircle },
+      { title: "Device SMS & Calls", url: "/device-comms", icon: PhoneCall },
+
     ],
   },
   {

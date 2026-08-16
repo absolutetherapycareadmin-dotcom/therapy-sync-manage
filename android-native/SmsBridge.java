@@ -6,6 +6,7 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.telephony.SmsManager;
 import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
@@ -18,7 +19,8 @@ import com.getcapacitor.annotation.Permission;
 import java.util.List;
 
 @CapacitorPlugin(name = "SmsBridge", permissions = {
-  @Permission(strings = { Manifest.permission.SEND_SMS }, alias = "sms")
+  @Permission(strings = { Manifest.permission.SEND_SMS }, alias = "sms"),
+  @Permission(strings = { Manifest.permission.CALL_PHONE }, alias = "call")
 })
 public class SmsBridge extends Plugin {
   @PluginMethod
@@ -50,6 +52,38 @@ public class SmsBridge extends Plugin {
 
   @PluginMethod
   public void requestPermission(PluginCall call) { requestPermissionForAlias("sms", call, "smsPermission"); }
+
+  @PluginMethod
+  public void checkCallPermission(PluginCall call) {
+    JSObject result = new JSObject();
+    result.put("granted", getContext().checkSelfPermission(Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED);
+    result.put("telephony", getContext().getPackageManager().hasSystemFeature("android.hardware.telephony"));
+    call.resolve(result);
+  }
+
+  @PluginMethod
+  public void requestCallPermission(PluginCall call) { requestPermissionForAlias("call", call, "callPermission"); }
+
+  /**
+   * Places a normal cellular call from the device's active SIM. When CALL_PHONE
+   * is not granted, Android's supported fallback is used: the number is handed
+   * to the system dialler so the staff member confirms the call.
+   */
+  @PluginMethod
+  public void call(PluginCall pluginCall) {
+    String phone = pluginCall.getString("phone", "");
+    if (phone == null || phone.isBlank()) { pluginCall.reject("phone is required"); return; }
+    boolean granted = getContext().checkSelfPermission(Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED;
+    try {
+      Intent intent = new Intent(granted ? Intent.ACTION_CALL : Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(phone)));
+      intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+      getContext().startActivity(intent);
+      JSObject result = new JSObject();
+      result.put("placed", true);
+      result.put("mode", granted ? "call" : "dialer");
+      pluginCall.resolve(result);
+    } catch (Exception e) { pluginCall.reject("Call failed: " + e.getMessage(), e); }
+  }
 
   private void sendNow(String phone, String message, PluginCall call) {
     if (phone.isBlank() || message.isBlank()) { call.reject("phone and message are required"); return; }
