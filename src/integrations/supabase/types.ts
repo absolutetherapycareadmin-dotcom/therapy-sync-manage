@@ -23,6 +23,9 @@ export type Database = {
           duration_minutes: number
           id: string
           notes: string | null
+          parent_action_at: string | null
+          parent_action_note: string | null
+          parent_confirmation_status: string
           recurrence_group_id: string | null
           room_id: string | null
           session_fee: number | null
@@ -40,6 +43,9 @@ export type Database = {
           duration_minutes?: number
           id?: string
           notes?: string | null
+          parent_action_at?: string | null
+          parent_action_note?: string | null
+          parent_confirmation_status?: string
           recurrence_group_id?: string | null
           room_id?: string | null
           session_fee?: number | null
@@ -57,6 +63,9 @@ export type Database = {
           duration_minutes?: number
           id?: string
           notes?: string | null
+          parent_action_at?: string | null
+          parent_action_note?: string | null
+          parent_confirmation_status?: string
           recurrence_group_id?: string | null
           room_id?: string | null
           session_fee?: number | null
@@ -158,6 +167,69 @@ export type Database = {
           },
         ]
       }
+      call_queue: {
+        Row: {
+          appointment_id: string | null
+          attempts: number
+          call_type: string
+          clinic_id: string
+          created_at: string
+          dialed_at: string | null
+          id: string
+          last_error: string | null
+          recipient_phone: string
+          recipient_role: string
+          scheduled_for: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          appointment_id?: string | null
+          attempts?: number
+          call_type?: string
+          clinic_id: string
+          created_at?: string
+          dialed_at?: string | null
+          id?: string
+          last_error?: string | null
+          recipient_phone: string
+          recipient_role?: string
+          scheduled_for?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          appointment_id?: string | null
+          attempts?: number
+          call_type?: string
+          clinic_id?: string
+          created_at?: string
+          dialed_at?: string | null
+          id?: string
+          last_error?: string | null
+          recipient_phone?: string
+          recipient_role?: string
+          scheduled_for?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_queue_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_queue_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       children: {
         Row: {
           address: string | null
@@ -223,40 +295,55 @@ export type Database = {
       clinics: {
         Row: {
           address: string | null
+          call_enabled: boolean
           city: string | null
           created_at: string
           currency: string
+          device_label: string | null
+          device_phone: string | null
           email: string | null
           id: string
           name: string
           owner_id: string
           phone: string | null
+          reminder_lead_minutes: number
+          sms_enabled: boolean
           timezone: string
           updated_at: string
         }
         Insert: {
           address?: string | null
+          call_enabled?: boolean
           city?: string | null
           created_at?: string
           currency?: string
+          device_label?: string | null
+          device_phone?: string | null
           email?: string | null
           id?: string
           name: string
           owner_id: string
           phone?: string | null
+          reminder_lead_minutes?: number
+          sms_enabled?: boolean
           timezone?: string
           updated_at?: string
         }
         Update: {
           address?: string | null
+          call_enabled?: boolean
           city?: string | null
           created_at?: string
           currency?: string
+          device_label?: string | null
+          device_phone?: string | null
           email?: string | null
           id?: string
           name?: string
           owner_id?: string
           phone?: string | null
+          reminder_lead_minutes?: number
+          sms_enabled?: boolean
           timezone?: string
           updated_at?: string
         }
@@ -503,6 +590,72 @@ export type Database = {
           },
         ]
       }
+      sms_queue: {
+        Row: {
+          appointment_id: string | null
+          attempts: number
+          clinic_id: string
+          created_at: string
+          id: string
+          last_error: string | null
+          message: string
+          message_type: string
+          recipient_phone: string
+          recipient_role: string
+          scheduled_for: string
+          sent_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          appointment_id?: string | null
+          attempts?: number
+          clinic_id: string
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          message: string
+          message_type?: string
+          recipient_phone: string
+          recipient_role?: string
+          scheduled_for?: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          appointment_id?: string | null
+          attempts?: number
+          clinic_id?: string
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          message?: string
+          message_type?: string
+          recipient_phone?: string
+          recipient_role?: string
+          scheduled_for?: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_queue_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_queue_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       specialties: {
         Row: {
           clinic_id: string
@@ -593,45 +746,70 @@ export type Database = {
       }
       whatsapp_messages: {
         Row: {
+          appointment_id: string | null
           child_id: string | null
           clinic_id: string
           created_at: string
+          delivered_at: string | null
+          error_message: string | null
           id: string
           message: string
           message_type: string
+          metadata: Json | null
           phone: string
+          read_at: string | null
           recipient_name: string | null
+          recipient_role: string
           sent_at: string | null
           status: string
           updated_at: string
         }
         Insert: {
+          appointment_id?: string | null
           child_id?: string | null
           clinic_id: string
           created_at?: string
+          delivered_at?: string | null
+          error_message?: string | null
           id?: string
           message: string
           message_type?: string
+          metadata?: Json | null
           phone: string
+          read_at?: string | null
           recipient_name?: string | null
+          recipient_role?: string
           sent_at?: string | null
           status?: string
           updated_at?: string
         }
         Update: {
+          appointment_id?: string | null
           child_id?: string | null
           clinic_id?: string
           created_at?: string
+          delivered_at?: string | null
+          error_message?: string | null
           id?: string
           message?: string
           message_type?: string
+          metadata?: Json | null
           phone?: string
+          read_at?: string | null
           recipient_name?: string | null
+          recipient_role?: string
           sent_at?: string | null
           status?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "whatsapp_messages_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "whatsapp_messages_child_id_fkey"
             columns: ["child_id"]
@@ -653,7 +831,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_valid_phone: { Args: { p_phone: string }; Returns: boolean }
+      normalize_phone: { Args: { p_phone: string }; Returns: string }
+      process_mock_parent_action: {
+        Args: { p_action: string; p_appointment_id: string; p_note?: string }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
