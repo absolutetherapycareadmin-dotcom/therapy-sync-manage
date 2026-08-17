@@ -2,7 +2,7 @@ name: Therapy Care Quality
 
 on:
   push:
-    branches: [main]
+    branches: [main, p0-communication-escalation]
   pull_request:
 
 permissions:
