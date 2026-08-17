@@ -116,6 +116,15 @@ function errorMessage(err: unknown) {
   return err instanceof Error ? err.message : "Unknown device error";
 }
 
+async function withinWorkingHours(clinicId: string) {
+  const { data, error } = await callRpc("is_communication_within_working_hours", {
+    p_clinic_id: clinicId,
+    p_at: new Date().toISOString(),
+  });
+  if (error) throw new Error(error.message);
+  return data === true;
+}
+
 async function escalationIsActive(eventId: string | null, stage: "sms" | "call") {
   if (!eventId) return true;
   const { data, error } = await callRpc("get_communication_escalation_state", {
@@ -228,6 +237,14 @@ export async function sendQueuedSms(row: SmsQueueRow) {
         .eq("status", "sending");
       return { skipped: true as const };
     }
+    if (!(await withinWorkingHours(row.clinic_id))) {
+      await supabase
+        .from("sms_queue")
+        .update({ status: "queued", last_error: "Centre communication working hours are closed" })
+        .eq("id", row.id)
+        .eq("status", "sending");
+      return { skipped: true as const };
+    }
     if (!isNativeDevice()) throw new Error("SMS can only be sent from the centre's Android device.");
 
     const result = await SmsBridge.send({
@@ -301,6 +318,14 @@ export async function placeQueuedCall(row: CallQueueRow) {
         .eq("status", "dialing");
       return { skipped: true as const };
     }
+    if (!(await withinWorkingHours(row.clinic_id))) {
+      await supabase
+        .from("call_queue")
+        .update({ status: "queued", last_error: "Centre communication working hours are closed" })
+        .eq("id", row.id)
+        .eq("status", "dialing");
+      return { skipped: true as const };
+    }
 
     const phone = normalizePhone(row.recipient_phone);
     if (isNativeDevice()) {
@@ -350,6 +375,7 @@ export type QueueRunResult = { processed: number; sent: number; failed: number; 
 
 export async function processDueSmsQueue(clinicId: string, limit = 20): Promise<QueueRunResult> {
   await processPendingInboundSmsResponses();
+  if (!(await withinWorkingHours(clinicId))) return { processed: 0, sent: 0, failed: 0, errors: [] };
 
   const { data, error } = await supabase
     .from("sms_queue")
@@ -378,6 +404,7 @@ export async function processDueSmsQueue(clinicId: string, limit = 20): Promise<
 
 export async function processDueCallQueue(clinicId: string, limit = 5): Promise<QueueRunResult> {
   await processPendingInboundSmsResponses();
+  if (!(await withinWorkingHours(clinicId))) return { processed: 0, sent: 0, failed: 0, errors: [] };
 
   const { data, error } = await supabase
     .from("call_queue")
