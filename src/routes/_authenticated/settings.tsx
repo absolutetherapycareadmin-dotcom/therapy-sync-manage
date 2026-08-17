@@ -10,18 +10,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
+import { SmsBridge } from "@/integrations/smsBridge";
 import { useAuth } from "@/lib/auth";
 import { specialtiesQuery } from "@/lib/queries";
 
 export const Route = createFileRoute("/_authenticated/settings")({
-  head: () => ({
-    meta: [
-      { title: "Settings — Therapy Care" },
-      { name: "description", content: "Manage clinic details, specialties and your account." },
-      { property: "og:title", content: "Settings — Therapy Care" },
-      { property: "og:description", content: "Manage clinic details, specialties and account." },
-    ],
-  }),
+  head: () => ({ meta: [
+    { title: "Settings — Therapy Care" },
+    { name: "description", content: "Manage clinic details, specialties and your account." },
+    { property: "og:title", content: "Settings — Therapy Care" },
+    { property: "og:description", content: "Manage clinic details, specialties and account." },
+  ] }),
   component: SettingsPage,
 });
 
@@ -29,146 +28,49 @@ function SettingsPage() {
   const { clinic, clinicId, profile, refresh, signOut } = useAuth();
   const id = clinicId as string;
   const qc = useQueryClient();
-
   const [form, setForm] = useState({ name: "", phone: "", email: "", city: "", address: "", currency: "INR" });
   const [specialtyName, setSpecialtyName] = useState("");
-
-  useEffect(() => {
-    if (clinic) setForm({ name: clinic.name ?? "", phone: clinic.phone ?? "", email: clinic.email ?? "", city: clinic.city ?? "", address: clinic.address ?? "", currency: clinic.currency ?? "INR" });
-  }, [clinic]);
-
+  useEffect(() => { if (clinic) setForm({ name: clinic.name ?? "", phone: clinic.phone ?? "", email: clinic.email ?? "", city: clinic.city ?? "", address: clinic.address ?? "", currency: clinic.currency ?? "INR" }); }, [clinic]);
   const specialties = useQuery({ ...specialtiesQuery(id), enabled: !!id });
+  const saveClinic = useMutation({ mutationFn: async () => { if (!form.name.trim()) throw new Error("Clinic name is required"); const { error } = await supabase.from("clinics").update({ name: form.name.trim(), phone: form.phone.trim() || null, email: form.email.trim() || null, city: form.city.trim() || null, address: form.address.trim() || null, currency: form.currency.trim().toUpperCase() || "INR" }).eq("id", id); if (error) throw error; await refresh(); }, onSuccess: () => toast.success("Clinic details saved"), onError: (e: Error) => toast.error(e.message) });
+  const addSpecialty = useMutation({ mutationFn: async () => { if (!specialtyName.trim()) throw new Error("Enter a specialty name"); const { error } = await supabase.from("specialties").insert({ clinic_id: id, name: specialtyName.trim() }); if (error) throw error; }, onSuccess: () => { setSpecialtyName(""); toast.success("Specialty added"); void qc.invalidateQueries({ queryKey: ["specialties", id] }); }, onError: (e: Error) => toast.error(e.message) });
+  const removeSpecialty = useMutation({ mutationFn: async (specialtyId: string) => { const { error } = await supabase.from("specialties").delete().eq("id", specialtyId); if (error) throw error; }, onSuccess: () => void qc.invalidateQueries({ queryKey: ["specialties", id] }), onError: (e: Error) => toast.error(e.message) });
 
-  const saveClinic = useMutation({
-    mutationFn: async () => {
-      if (!form.name.trim()) throw new Error("Clinic name is required");
-      const { error } = await supabase.from("clinics").update({ name: form.name.trim(), phone: form.phone.trim() || null, email: form.email.trim() || null, city: form.city.trim() || null, address: form.address.trim() || null, currency: form.currency.trim().toUpperCase() || "INR" }).eq("id", id);
-      if (error) throw error;
-      await refresh();
-    },
-    onSuccess: () => toast.success("Clinic details saved"),
-    onError: (e: Error) => toast.error(e.message),
-  });
+  return <div className="space-y-6">
+    <PageHeader title="Settings" description="Clinic profile, therapy specialties and account." />
+    <section className="rounded-xl border bg-card p-5"><h2 className="text-sm font-semibold">Clinic profile</h2><div className="mt-4 grid gap-4 sm:grid-cols-2">
+      <div className="space-y-2"><Label>Clinic name *</Label><Input value={form.name} maxLength={120} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+      <div className="space-y-2"><Label>Phone</Label><Input value={form.phone} maxLength={20} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
+      <div className="space-y-2"><Label>Email</Label><Input type="email" value={form.email} maxLength={255} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
+      <div className="space-y-2"><Label>City</Label><Input value={form.city} maxLength={80} onChange={(e) => setForm({ ...form, city: e.target.value })} /></div>
+      <div className="space-y-2"><Label>Currency</Label><Input value={form.currency} maxLength={3} onChange={(e) => setForm({ ...form, currency: e.target.value })} /></div>
+      <div className="space-y-2 sm:col-span-2"><Label>Address</Label><Textarea rows={2} maxLength={500} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
+    </div><div className="mt-4"><Button onClick={() => saveClinic.mutate()} disabled={saveClinic.isPending}>Save changes</Button></div></section>
 
-  const addSpecialty = useMutation({
-    mutationFn: async () => {
-      if (!specialtyName.trim()) throw new Error("Enter a specialty name");
-      const { error } = await supabase.from("specialties").insert({ clinic_id: id, name: specialtyName.trim() });
-      if (error) throw error;
-    },
-    onSuccess: () => { setSpecialtyName(""); toast.success("Specialty added"); void qc.invalidateQueries({ queryKey: ["specialties", id] }); },
-    onError: (e: Error) => toast.error(e.message),
-  });
+    <section className="rounded-xl border bg-card p-5"><h2 className="text-sm font-semibold">Therapy specialties</h2><p className="mt-1 text-sm text-muted-foreground">Used across therapists, packages and appointments.</p><div className="mt-4 flex gap-2"><Input value={specialtyName} maxLength={80} placeholder="e.g. Occupational Therapy" onChange={(e) => setSpecialtyName(e.target.value)} /><Button onClick={() => addSpecialty.mutate()} disabled={addSpecialty.isPending}><Plus className="size-4" />Add</Button></div>{(specialties.data ?? []).length === 0 ? <p className="mt-4 text-sm text-muted-foreground">No specialties added yet.</p> : <ul className="mt-4 divide-y rounded-lg border">{(specialties.data ?? []).map((s) => <li key={s.id} className="flex items-center justify-between px-3 py-2 text-sm"><span>{s.name}</span><Button variant="ghost" size="sm" onClick={() => removeSpecialty.mutate(s.id)} aria-label={`Remove ${s.name}`}><Trash2 className="size-4" /></Button></li>)}</ul>}</section>
 
-  const removeSpecialty = useMutation({
-    mutationFn: async (specialtyId: string) => { const { error } = await supabase.from("specialties").delete().eq("id", specialtyId); if (error) throw error; },
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ["specialties", id] }),
-    onError: (e: Error) => toast.error(e.message),
-  });
+    <CommunicationDeviceSection />
+    <SmsSubscriptionSection />
 
-  return (
-    <div className="space-y-6">
-      <PageHeader title="Settings" description="Clinic profile, therapy specialties and account." />
-      <section className="rounded-xl border bg-card p-5">
-        <h2 className="text-sm font-semibold">Clinic profile</h2>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2"><Label>Clinic name *</Label><Input value={form.name} maxLength={120} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-          <div className="space-y-2"><Label>Phone</Label><Input value={form.phone} maxLength={20} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
-          <div className="space-y-2"><Label>Email</Label><Input type="email" value={form.email} maxLength={255} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
-          <div className="space-y-2"><Label>City</Label><Input value={form.city} maxLength={80} onChange={(e) => setForm({ ...form, city: e.target.value })} /></div>
-          <div className="space-y-2"><Label>Currency</Label><Input value={form.currency} maxLength={3} onChange={(e) => setForm({ ...form, currency: e.target.value })} /></div>
-          <div className="space-y-2 sm:col-span-2"><Label>Address</Label><Textarea rows={2} maxLength={500} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
-        </div>
-        <div className="mt-4"><Button onClick={() => saveClinic.mutate()} disabled={saveClinic.isPending}>Save changes</Button></div>
-      </section>
-
-      <section className="rounded-xl border bg-card p-5">
-        <h2 className="text-sm font-semibold">Therapy specialties</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Used across therapists, packages and appointments.</p>
-        <div className="mt-4 flex gap-2"><Input value={specialtyName} maxLength={80} placeholder="e.g. Occupational Therapy" onChange={(e) => setSpecialtyName(e.target.value)} /><Button onClick={() => addSpecialty.mutate()} disabled={addSpecialty.isPending}><Plus className="size-4" />Add</Button></div>
-        {(specialties.data ?? []).length === 0 ? <p className="mt-4 text-sm text-muted-foreground">No specialties added yet.</p> : <ul className="mt-4 divide-y rounded-lg border">{(specialties.data ?? []).map((s) => <li key={s.id} className="flex items-center justify-between px-3 py-2 text-sm"><span>{s.name}</span><Button variant="ghost" size="sm" onClick={() => removeSpecialty.mutate(s.id)} aria-label={`Remove ${s.name}`}><Trash2 className="size-4" /></Button></li>)}</ul>}
-      </section>
-
-      <CommunicationDeviceSection />
-
-      <section className="rounded-xl border bg-card p-5">
-        <h2 className="text-sm font-semibold">Account</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Signed in as {profile?.email ?? "—"} ({profile?.role ?? "member"}).</p>
-        <div className="mt-4"><Button variant="outline" onClick={() => void signOut()}>Sign out</Button></div>
-      </section>
-    </div>
-  );
+    <section className="rounded-xl border bg-card p-5"><h2 className="text-sm font-semibold">Account</h2><p className="mt-1 text-sm text-muted-foreground">Signed in as {profile?.email ?? "—"} ({profile?.role ?? "member"}).</p><div className="mt-4"><Button variant="outline" onClick={() => void signOut()}>Sign out</Button></div></section>
+  </div>;
 }
 
-type CommunicationSettings = {
-  device_phone: string;
-  device_label: string;
-  sms_enabled: boolean;
-  call_enabled: boolean;
-  reminder_lead_minutes: number;
-  whatsapp_escalation_enabled: boolean;
-  whatsapp_to_sms_wait_minutes: number;
-  sms_to_call_wait_minutes: number;
-  communication_working_hours_enabled: boolean;
-  communication_working_hours_start: string;
-  communication_working_hours_end: string;
-};
+type CommunicationSettings = { device_phone: string; device_label: string; sms_enabled: boolean; call_enabled: boolean; reminder_lead_minutes: number; whatsapp_escalation_enabled: boolean; whatsapp_to_sms_wait_minutes: number; sms_to_call_wait_minutes: number; communication_working_hours_enabled: boolean; communication_working_hours_start: string; communication_working_hours_end: string };
 
 function CommunicationDeviceSection() {
   const { clinic, clinicId, refresh } = useAuth();
   const [device, setDevice] = useState<CommunicationSettings>({ device_phone: "", device_label: "", sms_enabled: true, call_enabled: true, reminder_lead_minutes: 30, whatsapp_escalation_enabled: true, whatsapp_to_sms_wait_minutes: 60, sms_to_call_wait_minutes: 15, communication_working_hours_enabled: false, communication_working_hours_start: "08:00", communication_working_hours_end: "20:00" });
+  useEffect(() => { if (clinic) { const c = clinic as typeof clinic & Partial<CommunicationSettings>; setDevice({ device_phone: c.device_phone ?? "", device_label: c.device_label ?? "", sms_enabled: c.sms_enabled ?? true, call_enabled: c.call_enabled ?? true, reminder_lead_minutes: c.reminder_lead_minutes ?? 30, whatsapp_escalation_enabled: c.whatsapp_escalation_enabled ?? true, whatsapp_to_sms_wait_minutes: c.whatsapp_to_sms_wait_minutes ?? 60, sms_to_call_wait_minutes: c.sms_to_call_wait_minutes ?? 15, communication_working_hours_enabled: c.communication_working_hours_enabled ?? false, communication_working_hours_start: c.communication_working_hours_start?.slice(0, 5) ?? "08:00", communication_working_hours_end: c.communication_working_hours_end?.slice(0, 5) ?? "20:00" }); } }, [clinic]);
+  const save = useMutation({ mutationFn: async () => { const phone = device.device_phone.replace(/[^\d+]/g, ""); if (phone && !/^\+?\d{8,15}$/.test(phone)) throw new Error("Enter a valid device phone number"); const lead = Number(device.reminder_lead_minutes); const waWait = Number(device.whatsapp_to_sms_wait_minutes); const smsWait = Number(device.sms_to_call_wait_minutes); if (!Number.isFinite(lead) || lead < 5 || lead > 240) throw new Error("Reminder lead time must be between 5 and 240 minutes"); if (!Number.isFinite(waWait) || waWait < 0 || waWait > 10080) throw new Error("WhatsApp → SMS wait must be between 0 and 10080 minutes"); if (!Number.isFinite(smsWait) || smsWait < 0 || smsWait > 10080) throw new Error("SMS → Call wait must be between 0 and 10080 minutes"); if (device.communication_working_hours_enabled && device.communication_working_hours_start >= device.communication_working_hours_end) throw new Error("Working-hours start must be earlier than end"); const { error } = await supabase.from("clinics").update({ device_phone: phone || null, device_label: device.device_label.trim() || null, sms_enabled: device.sms_enabled, call_enabled: device.call_enabled, reminder_lead_minutes: Math.round(lead), whatsapp_escalation_enabled: device.whatsapp_escalation_enabled, whatsapp_to_sms_wait_minutes: Math.round(waWait), sms_to_call_wait_minutes: Math.round(smsWait), communication_working_hours_enabled: device.communication_working_hours_enabled, communication_working_hours_start: device.communication_working_hours_start, communication_working_hours_end: device.communication_working_hours_end } as never).eq("id", clinicId as string); if (error) throw error; await refresh(); }, onSuccess: () => toast.success("Communication settings saved"), onError: (e: Error) => toast.error(e.message) });
+  return <section className="rounded-xl border bg-card p-5"><h2 className="text-sm font-semibold">Communication device & escalation</h2><p className="mt-1 text-sm text-muted-foreground">Normal SMS and cellular calls use the centre Android device and its active SIM. WhatsApp ₹0 mode opens a pre-filled deep link; it never claims delivery/read status.</p><div className="mt-4 grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label>Device phone number</Label><Input value={device.device_phone} maxLength={20} placeholder="+9198XXXXXXXX" onChange={(e) => setDevice({ ...device, device_phone: e.target.value })} /></div><div className="space-y-2"><Label>Device label</Label><Input value={device.device_label} maxLength={80} placeholder="Front desk Android phone" onChange={(e) => setDevice({ ...device, device_label: e.target.value })} /></div><div className="space-y-2"><Label>WhatsApp → SMS wait (minutes)</Label><Input type="number" min={0} max={10080} value={device.whatsapp_to_sms_wait_minutes} onChange={(e) => setDevice({ ...device, whatsapp_to_sms_wait_minutes: Number(e.target.value) })} /></div><div className="space-y-2"><Label>SMS → Call wait (minutes)</Label><Input type="number" min={0} max={10080} value={device.sms_to_call_wait_minutes} onChange={(e) => setDevice({ ...device, sms_to_call_wait_minutes: Number(e.target.value) })} /></div><div className="space-y-2"><Label>Appointment call-reminder lead time (minutes)</Label><Input type="number" min={5} max={240} value={device.reminder_lead_minutes} onChange={(e) => setDevice({ ...device, reminder_lead_minutes: Number(e.target.value) })} /></div><div className="flex items-end gap-6 flex-wrap"><label className="flex items-center gap-2 text-sm"><input type="checkbox" className="size-4 accent-primary" checked={device.whatsapp_escalation_enabled} onChange={(e) => setDevice({ ...device, whatsapp_escalation_enabled: e.target.checked })} />WhatsApp escalation</label><label className="flex items-center gap-2 text-sm"><input type="checkbox" className="size-4 accent-primary" checked={device.sms_enabled} onChange={(e) => setDevice({ ...device, sms_enabled: e.target.checked })} />SMS fallback</label><label className="flex items-center gap-2 text-sm"><input type="checkbox" className="size-4 accent-primary" checked={device.call_enabled} onChange={(e) => setDevice({ ...device, call_enabled: e.target.checked })} />Call fallback / reminders</label></div></div><div className="mt-5 rounded-lg border p-4"><div className="flex items-center gap-2"><input id="working-hours-enabled" type="checkbox" className="size-4 accent-primary" checked={device.communication_working_hours_enabled} onChange={(e) => setDevice({ ...device, communication_working_hours_enabled: e.target.checked })} /><Label htmlFor="working-hours-enabled">Respect centre communication working hours</Label></div><p className="mt-1 text-xs text-muted-foreground">When enabled, queued SMS/call execution waits until the configured local centre window.</p><div className="mt-3 grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label>Working hours start</Label><Input type="time" value={device.communication_working_hours_start} disabled={!device.communication_working_hours_enabled} onChange={(e) => setDevice({ ...device, communication_working_hours_start: e.target.value })} /></div><div className="space-y-2"><Label>Working hours end</Label><Input type="time" value={device.communication_working_hours_end} disabled={!device.communication_working_hours_enabled} onChange={(e) => setDevice({ ...device, communication_working_hours_end: e.target.value })} /></div></div></div><div className="mt-4"><Button onClick={() => save.mutate()} disabled={save.isPending}>Save communication settings</Button></div></section>;
+}
 
-  useEffect(() => {
-    if (clinic) {
-      const c = clinic as typeof clinic & Partial<CommunicationSettings>;
-      setDevice({ device_phone: c.device_phone ?? "", device_label: c.device_label ?? "", sms_enabled: c.sms_enabled ?? true, call_enabled: c.call_enabled ?? true, reminder_lead_minutes: c.reminder_lead_minutes ?? 30, whatsapp_escalation_enabled: c.whatsapp_escalation_enabled ?? true, whatsapp_to_sms_wait_minutes: c.whatsapp_to_sms_wait_minutes ?? 60, sms_to_call_wait_minutes: c.sms_to_call_wait_minutes ?? 15, communication_working_hours_enabled: c.communication_working_hours_enabled ?? false, communication_working_hours_start: c.communication_working_hours_start?.slice(0, 5) ?? "08:00", communication_working_hours_end: c.communication_working_hours_end?.slice(0, 5) ?? "20:00" });
-    }
-  }, [clinic]);
-
-  const save = useMutation({
-    mutationFn: async () => {
-      const phone = device.device_phone.replace(/[^\d+]/g, "");
-      if (phone && !/^\+?\d{8,15}$/.test(phone)) throw new Error("Enter a valid device phone number");
-      const lead = Number(device.reminder_lead_minutes);
-      const waWait = Number(device.whatsapp_to_sms_wait_minutes);
-      const smsWait = Number(device.sms_to_call_wait_minutes);
-      if (!Number.isFinite(lead) || lead < 5 || lead > 240) throw new Error("Reminder lead time must be between 5 and 240 minutes");
-      if (!Number.isFinite(waWait) || waWait < 0 || waWait > 10080) throw new Error("WhatsApp → SMS wait must be between 0 and 10080 minutes");
-      if (!Number.isFinite(smsWait) || smsWait < 0 || smsWait > 10080) throw new Error("SMS → Call wait must be between 0 and 10080 minutes");
-      if (device.communication_working_hours_enabled && device.communication_working_hours_start >= device.communication_working_hours_end) throw new Error("Working-hours start must be earlier than end");
-      const { error } = await supabase.from("clinics").update({ device_phone: phone || null, device_label: device.device_label.trim() || null, sms_enabled: device.sms_enabled, call_enabled: device.call_enabled, reminder_lead_minutes: Math.round(lead), whatsapp_escalation_enabled: device.whatsapp_escalation_enabled, whatsapp_to_sms_wait_minutes: Math.round(waWait), sms_to_call_wait_minutes: Math.round(smsWait), communication_working_hours_enabled: device.communication_working_hours_enabled, communication_working_hours_start: device.communication_working_hours_start, communication_working_hours_end: device.communication_working_hours_end } as never).eq("id", clinicId as string);
-      if (error) throw error;
-      await refresh();
-    },
-    onSuccess: () => toast.success("Communication settings saved"),
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  return (
-    <section className="rounded-xl border bg-card p-5">
-      <h2 className="text-sm font-semibold">Communication device & escalation</h2>
-      <p className="mt-1 text-sm text-muted-foreground">Normal SMS and cellular calls use the centre Android device and its active SIM. WhatsApp ₹0 mode opens a pre-filled deep link; it never claims delivery/read status.</p>
-      <div className="mt-4 grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2"><Label>Device phone number</Label><Input value={device.device_phone} maxLength={20} placeholder="+9198XXXXXXXX" onChange={(e) => setDevice({ ...device, device_phone: e.target.value })} /></div>
-        <div className="space-y-2"><Label>Device label</Label><Input value={device.device_label} maxLength={80} placeholder="Front desk Android phone" onChange={(e) => setDevice({ ...device, device_label: e.target.value })} /></div>
-        <div className="space-y-2"><Label>WhatsApp → SMS wait (minutes)</Label><Input type="number" min={0} max={10080} value={device.whatsapp_to_sms_wait_minutes} onChange={(e) => setDevice({ ...device, whatsapp_to_sms_wait_minutes: Number(e.target.value) })} /></div>
-        <div className="space-y-2"><Label>SMS → Call wait (minutes)</Label><Input type="number" min={0} max={10080} value={device.sms_to_call_wait_minutes} onChange={(e) => setDevice({ ...device, sms_to_call_wait_minutes: Number(e.target.value) })} /></div>
-        <div className="space-y-2"><Label>Appointment call-reminder lead time (minutes)</Label><Input type="number" min={5} max={240} value={device.reminder_lead_minutes} onChange={(e) => setDevice({ ...device, reminder_lead_minutes: Number(e.target.value) })} /></div>
-        <div className="flex items-end gap-6 flex-wrap">
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="size-4 accent-primary" checked={device.whatsapp_escalation_enabled} onChange={(e) => setDevice({ ...device, whatsapp_escalation_enabled: e.target.checked })} />WhatsApp escalation</label>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="size-4 accent-primary" checked={device.sms_enabled} onChange={(e) => setDevice({ ...device, sms_enabled: e.target.checked })} />SMS fallback</label>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="size-4 accent-primary" checked={device.call_enabled} onChange={(e) => setDevice({ ...device, call_enabled: e.target.checked })} />Call fallback / reminders</label>
-        </div>
-      </div>
-      <div className="mt-5 rounded-lg border p-4">
-        <div className="flex items-center gap-2"><input id="working-hours-enabled" type="checkbox" className="size-4 accent-primary" checked={device.communication_working_hours_enabled} onChange={(e) => setDevice({ ...device, communication_working_hours_enabled: e.target.checked })} /><Label htmlFor="working-hours-enabled">Respect centre communication working hours</Label></div>
-        <p className="mt-1 text-xs text-muted-foreground">When enabled, queued SMS/call execution waits until the configured local centre window.</p>
-        <div className="mt-3 grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2"><Label>Working hours start</Label><Input type="time" value={device.communication_working_hours_start} disabled={!device.communication_working_hours_enabled} onChange={(e) => setDevice({ ...device, communication_working_hours_start: e.target.value })} /></div>
-          <div className="space-y-2"><Label>Working hours end</Label><Input type="time" value={device.communication_working_hours_end} disabled={!device.communication_working_hours_enabled} onChange={(e) => setDevice({ ...device, communication_working_hours_end: e.target.value })} /></div>
-        </div>
-      </div>
-      <div className="mt-4"><Button onClick={() => save.mutate()} disabled={save.isPending}>Save communication settings</Button></div>
-    </section>
-  );
+function SmsSubscriptionSection() {
+  const { clinic, clinicId, refresh } = useAuth();
+  const [selected, setSelected] = useState<string>("");
+  const subscriptions = useQuery({ queryKey: ["android-sms-subscriptions"], queryFn: () => SmsBridge.getActiveSubscriptions(), staleTime: 30000, retry: false });
+  useEffect(() => { const current = (clinic as typeof clinic & { device_subscription_id?: number | null } | null)?.device_subscription_id; setSelected(current ? String(current) : ""); }, [clinic]);
+  const save = useMutation({ mutationFn: async () => { const subscriptionId = selected ? Number(selected) : null; if (subscriptionId !== null && (!Number.isInteger(subscriptionId) || subscriptionId <= 0)) throw new Error("Select a valid SIM subscription"); const { error } = await supabase.from("clinics").update({ device_subscription_id: subscriptionId } as never).eq("id", clinicId as string); if (error) throw error; await refresh(); }, onSuccess: () => toast.success("SMS SIM selection saved"), onError: (e: Error) => toast.error(e.message) });
+  return <section className="rounded-xl border bg-card p-5"><h2 className="text-sm font-semibold">Android SMS SIM</h2><p className="mt-1 text-sm text-muted-foreground">On Android, queued outbound SMS uses this subscription when selected. Leave it as automatic to use the device's default/first active subscription. A real dual-SIM test is still required to verify carrier behaviour.</p><div className="mt-4 flex flex-wrap items-end gap-3"><div className="space-y-2 min-w-[260px]"><Label>SMS subscription</Label><select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={selected} onChange={(e) => setSelected(e.target.value)}><option value="">Automatic/default</option>{(subscriptions.data ?? []).map((s) => <option key={s.subscriptionId} value={s.subscriptionId}>{s.displayName}{s.carrierName ? ` — ${s.carrierName}` : ""} (slot {s.slotIndex + 1})</option>)}</select></div><Button onClick={() => save.mutate()} disabled={save.isPending}>Save SIM selection</Button></div>{subscriptions.error ? <p className="mt-2 text-xs text-muted-foreground">SIM list is available inside the Android app after phone-state permission is granted.</p> : null}</section>;
 }
