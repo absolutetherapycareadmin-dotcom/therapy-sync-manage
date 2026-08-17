@@ -31,6 +31,8 @@ jobs:
         with:
           deno-version: v2.x
       - run: deno check supabase/functions/whatsapp-mock/index.ts
+      - run: deno check supabase/functions/whatsapp-api/index.ts
+      - run: deno check supabase/functions/whatsapp-webhook/index.ts
 
   supabase:
     runs-on: ubuntu-24.04
