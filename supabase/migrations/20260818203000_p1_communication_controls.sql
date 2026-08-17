@@ -48,13 +48,17 @@ AS $$
 DECLARE
   e public.communication_escalations%ROWTYPE;
   caller_clinic uuid;
+  caller_role text;
 BEGIN
-  SELECT p.clinic_id INTO caller_clinic
+  SELECT p.clinic_id, p.role INTO caller_clinic, caller_role
   FROM public.profiles p
   WHERE p.id = auth.uid();
 
   IF caller_clinic IS NULL THEN
     RAISE EXCEPTION 'Not authenticated or no clinic assigned';
+  END IF;
+  IF caller_role NOT IN ('owner', 'admin') THEN
+    RAISE EXCEPTION 'Centre Admin role required';
   END IF;
 
   SELECT * INTO e
@@ -67,28 +71,20 @@ BEGIN
   IF e.status NOT IN ('waiting_whatsapp','waiting_sms','waiting_call') THEN RETURN true; END IF;
 
   UPDATE public.communication_escalations
-  SET status = 'cancelled',
-      current_stage = 'completed',
-      cancelled_at = now(),
-      cancel_reason = left(COALESCE(p_reason, 'admin_cancelled'), 200)
-  WHERE id = e.id
-    AND status IN ('waiting_whatsapp','waiting_sms','waiting_call');
+  SET status = 'cancelled', current_stage = 'completed', cancelled_at = now(), cancel_reason = left(COALESCE(p_reason, 'admin_cancelled'), 200)
+  WHERE id = e.id AND status IN ('waiting_whatsapp','waiting_sms','waiting_call');
 
   UPDATE public.whatsapp_messages
-  SET status = 'cancelled',
-      metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('invalidated_reason', COALESCE(p_reason, 'admin_cancelled'))
-  WHERE communication_event_id = e.id
-    AND status IN ('queued','manual_opened');
+  SET status = 'cancelled', metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('invalidated_reason', COALESCE(p_reason, 'admin_cancelled'))
+  WHERE communication_event_id = e.id AND status IN ('queued','manual_opened');
 
   UPDATE public.sms_queue
   SET status = 'cancelled', last_error = 'Communication escalation cancelled by admin'
-  WHERE communication_event_id = e.id
-    AND status IN ('queued','sending');
+  WHERE communication_event_id = e.id AND status IN ('queued','sending');
 
   UPDATE public.call_queue
   SET status = 'cancelled', last_error = 'Communication escalation cancelled by admin'
-  WHERE communication_event_id = e.id
-    AND status IN ('queued','dialing');
+  WHERE communication_event_id = e.id AND status IN ('queued','dialing');
 
   RETURN true;
 END;
