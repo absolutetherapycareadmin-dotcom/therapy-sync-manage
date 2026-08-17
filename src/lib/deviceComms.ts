@@ -141,6 +141,56 @@ async function failSms(row: SmsQueueRow, message: string) {
     .eq("status", "sending");
 }
 
+/**
+ * Drain native inbound SMS records and submit only correlated responses to the
+ * authoritative escalation RPC. Failed network calls remain on-device and are
+ * retried on the next queue pass; unmatched/expired responses are acknowledged
+ * and cannot affect another appointment.
+ */
+export async function processPendingInboundSmsResponses() {
+  if (!isNativeDevice()) return { processed: 0, stopped: 0, ignored: 0, errors: [] as string[] };
+
+  let pending: Awaited<ReturnType<typeof SmsBridge.getPendingInboundSms>>;
+  try {
+    pending = await SmsBridge.getPendingInboundSms();
+  } catch (err) {
+    return { processed: 0, stopped: 0, ignored: 0, errors: [errorMessage(err)] };
+  }
+
+  const result = { processed: 0, stopped: 0, ignored: 0, errors: [] as string[] };
+  for (const sms of pending) {
+    try {
+      const { data, error } = await callRpc("process_parent_sms_response", {
+        p_sender_phone: normalizePhone(sms.senderPhone),
+        p_response_token: extractResponseToken(sms.message),
+        p_message: sms.message,
+      });
+      if (error) throw new Error(error.message);
+
+      const outcome = data as { ok?: boolean; already_stopped?: boolean; recorded?: boolean; reason?: string } | null;
+      if (outcome?.ok) {
+        result.processed += 1;
+        if (!outcome.already_stopped) result.stopped += 1;
+        await SmsBridge.acknowledgeInboundSms({ id: sms.id });
+      } else if (outcome?.reason === "unmatched_response" || outcome?.reason === "sender_mismatch" || outcome?.reason === "invalid_response") {
+        result.ignored += 1;
+        await SmsBridge.acknowledgeInboundSms({ id: sms.id });
+      } else {
+        throw new Error(outcome?.reason ?? "Parent SMS response was not processed");
+      }
+    } catch (err) {
+      result.errors.push(errorMessage(err));
+    }
+  }
+
+  return result;
+}
+
+function extractResponseToken(message: string) {
+  const match = message.match(/(?:APPROVE|CANCEL|CHANGE)\s+([a-f0-9]{10})/i);
+  return match?.[1] ?? "";
+}
+
 /** Sends one queued SMS through the centre device. Safe to call repeatedly. */
 export async function sendQueuedSms(row: SmsQueueRow) {
   if (!isValidPhone(row.recipient_phone)) {
@@ -299,6 +349,8 @@ export async function placeQueuedCall(row: CallQueueRow) {
 export type QueueRunResult = { processed: number; sent: number; failed: number; errors: string[] };
 
 export async function processDueSmsQueue(clinicId: string, limit = 20): Promise<QueueRunResult> {
+  await processPendingInboundSmsResponses();
+
   const { data, error } = await supabase
     .from("sms_queue")
     .select("*")
@@ -325,6 +377,8 @@ export async function processDueSmsQueue(clinicId: string, limit = 20): Promise<
 }
 
 export async function processDueCallQueue(clinicId: string, limit = 5): Promise<QueueRunResult> {
+  await processPendingInboundSmsResponses();
+
   const { data, error } = await supabase
     .from("call_queue")
     .select("*")
