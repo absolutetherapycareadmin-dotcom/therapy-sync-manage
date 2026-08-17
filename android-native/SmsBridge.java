@@ -5,24 +5,32 @@ import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.telephony.SmsManager;
 import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
+import org.json.JSONArray;
+import org.json.JSONObject;
 import java.util.List;
+import java.util.UUID;
 
 @CapacitorPlugin(name = "SmsBridge", permissions = {
-  @Permission(strings = { Manifest.permission.SEND_SMS }, alias = "sms"),
+  @Permission(strings = { Manifest.permission.SEND_SMS, Manifest.permission.RECEIVE_SMS }, alias = "sms"),
   @Permission(strings = { Manifest.permission.CALL_PHONE }, alias = "call")
 })
 public class SmsBridge extends Plugin {
+  private static final String PREFS = "therapycare_sms_bridge";
+  private static final String PENDING_INBOUND = "pending_inbound_sms";
+
   @PluginMethod
   public void send(PluginCall call) { sendNow(call.getString("phone", ""), call.getString("message", ""), call); }
 
@@ -46,6 +54,7 @@ public class SmsBridge extends Plugin {
   public void checkPermission(PluginCall call) {
     JSObject result = new JSObject();
     result.put("granted", getContext().checkSelfPermission(Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED);
+    result.put("inboundGranted", getContext().checkSelfPermission(Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED);
     result.put("telephony", getContext().getPackageManager().hasSystemFeature("android.hardware.telephony.messaging"));
     call.resolve(result);
   }
@@ -83,6 +92,68 @@ public class SmsBridge extends Plugin {
       result.put("mode", granted ? "call" : "dialer");
       pluginCall.resolve(result);
     } catch (Exception e) { pluginCall.reject("Call failed: " + e.getMessage(), e); }
+  }
+
+  @PluginMethod
+  public void getPendingInboundSms(PluginCall call) {
+    if (getContext().checkSelfPermission(Manifest.permission.RECEIVE_SMS) != PackageManager.PERMISSION_GRANTED) {
+      call.resolve(new JSArray());
+      return;
+    }
+    try {
+      String raw = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(PENDING_INBOUND, "[]");
+      JSONArray stored = new JSONArray(raw);
+      JSArray result = new JSArray();
+      for (int i = 0; i < stored.length(); i++) {
+        JSONObject item = stored.getJSONObject(i);
+        JSObject row = new JSObject();
+        row.put("id", item.optString("id"));
+        row.put("senderPhone", item.optString("senderPhone"));
+        row.put("message", item.optString("message"));
+        row.put("receivedAt", item.optLong("receivedAt", System.currentTimeMillis()));
+        result.put(row);
+      }
+      call.resolve(result);
+    } catch (Exception e) {
+      call.reject("Unable to read pending inbound SMS", e);
+    }
+  }
+
+  @PluginMethod
+  public void acknowledgeInboundSms(PluginCall call) {
+    String id = call.getString("id", "");
+    if (id.isBlank()) { call.reject("id is required"); return; }
+    try {
+      SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+      JSONArray stored = new JSONArray(prefs.getString(PENDING_INBOUND, "[]"));
+      JSONArray remaining = new JSONArray();
+      for (int i = 0; i < stored.length(); i++) {
+        JSONObject item = stored.getJSONObject(i);
+        if (!id.equals(item.optString("id"))) remaining.put(item);
+      }
+      prefs.edit().putString(PENDING_INBOUND, remaining.toString()).apply();
+      call.resolve();
+    } catch (Exception e) {
+      call.reject("Unable to acknowledge inbound SMS", e);
+    }
+  }
+
+  /** Called by the manifest SMS receiver; data is persisted until the JS queue can process it. */
+  public static void storeInboundSms(Context context, String senderPhone, String message, long receivedAt) {
+    if (senderPhone == null || senderPhone.isBlank() || message == null || message.isBlank()) return;
+    try {
+      SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+      JSONArray stored = new JSONArray(prefs.getString(PENDING_INBOUND, "[]"));
+      JSONObject item = new JSONObject();
+      item.put("id", UUID.randomUUID().toString());
+      item.put("senderPhone", senderPhone);
+      item.put("message", message);
+      item.put("receivedAt", receivedAt);
+      stored.put(item);
+      prefs.edit().putString(PENDING_INBOUND, stored.toString()).apply();
+    } catch (Exception ignored) {
+      // Never crash the system SMS receiver because local persistence failed.
+    }
   }
 
   private void sendNow(String phone, String message, PluginCall call) {
