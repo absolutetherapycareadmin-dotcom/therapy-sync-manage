@@ -1,7 +1,4 @@
 project_id = "yxqbruyeolrrwfolympu"
 
-[functions.whatsapp-automation]
-verify_jwt = false
-
 [functions.whatsapp-mock]
 verify_jwt = true
