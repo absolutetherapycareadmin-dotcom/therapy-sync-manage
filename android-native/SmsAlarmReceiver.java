@@ -7,6 +7,7 @@ import android.os.Bundle;
 import android.provider.Telephony;
 import android.telephony.SmsMessage;
 import android.telephony.SmsManager;
+import android.telephony.SubscriptionManager;
 import java.util.ArrayList;
 
 public class SmsAlarmReceiver extends BroadcastReceiver {
@@ -15,26 +16,26 @@ public class SmsAlarmReceiver extends BroadcastReceiver {
   public static final String EXTRA_MESSAGE = "message";
 
   @Override public void onReceive(Context context, Intent intent) {
-    if (ACTION_SEND_SMS.equals(intent.getAction())) {
-      sendScheduledSms(context, intent);
-      return;
-    }
-
-    if (Telephony.Sms.Intents.SMS_RECEIVED_ACTION.equals(intent.getAction())) {
-      captureInboundSms(context, intent);
-    }
+    if (ACTION_SEND_SMS.equals(intent.getAction())) { sendScheduledSms(context, intent); return; }
+    if (Telephony.Sms.Intents.SMS_RECEIVED_ACTION.equals(intent.getAction())) captureInboundSms(context, intent);
   }
 
   private void sendScheduledSms(Context context, Intent intent) {
     String phone = intent.getStringExtra(EXTRA_PHONE);
     String message = intent.getStringExtra(EXTRA_MESSAGE);
+    long subscriptionId = intent.getLongExtra("subscriptionId", -1L);
     if (phone == null || phone.isBlank() || message == null || message.isBlank()) return;
     try {
-      SmsManager manager = SmsManager.getDefault();
+      SmsManager manager;
+      if (subscriptionId > 0 && context.checkSelfPermission(android.Manifest.permission.READ_PHONE_STATE) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+        manager = SmsManager.getSmsManagerForSubscriptionId((int) subscriptionId);
+      } else {
+        manager = SmsManager.getDefault();
+      }
       ArrayList<String> parts = manager.divideMessage(message);
       manager.sendMultipartTextMessage(phone, null, parts, null, null);
     } catch (RuntimeException ignored) {
-      // The app's server-side queue remains the source of truth for retry/status handling.
+      // The server-side queue remains authoritative for retry/status handling.
     }
   }
 
@@ -43,7 +44,6 @@ public class SmsAlarmReceiver extends BroadcastReceiver {
     if (extras == null) return;
     SmsMessage[] messages = Telephony.Sms.Intents.getMessagesFromIntent(intent);
     if (messages == null || messages.length == 0) return;
-
     StringBuilder body = new StringBuilder();
     String sender = null;
     long receivedAt = System.currentTimeMillis();
@@ -52,7 +52,6 @@ public class SmsAlarmReceiver extends BroadcastReceiver {
       body.append(message.getMessageBody());
       if (message.getTimestampMillis() > 0) receivedAt = message.getTimestampMillis();
     }
-
     SmsBridge.storeInboundSms(context, sender, body.toString(), receivedAt);
   }
 }
