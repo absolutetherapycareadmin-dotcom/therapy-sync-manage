@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 export type SmsQueueRow = {
   id: string;
+  clinic_id: string;
   appointment_id: string | null;
   communication_event_id: string | null;
   recipient_role: string;
@@ -27,6 +28,7 @@ export type SmsQueueRow = {
 
 export type CallQueueRow = {
   id: string;
+  clinic_id: string;
   appointment_id: string | null;
   communication_event_id: string | null;
   recipient_role: string;
@@ -188,23 +190,31 @@ export async function sendQueuedSms(row: SmsQueueRow) {
         const { data: clinic, error: clinicError } = await supabase
           .from("clinics")
           .select("call_enabled,sms_to_call_wait_minutes")
-          .eq("id", (await supabase.from("sms_queue").select("clinic_id").eq("id", row.id).single()).data?.clinic_id ?? "")
+          .eq("id", row.clinic_id)
           .maybeSingle();
         if (clinicError) throw clinicError;
 
         if (clinic?.call_enabled ?? true) {
-          const callAt = new Date(new Date(sentAt).getTime() + Math.max(Number(clinic?.sms_to_call_wait_minutes ?? 15), 0) * 60000).toISOString();
+          const callAt = new Date(
+            new Date(sentAt).getTime() + Math.max(Number(clinic?.sms_to_call_wait_minutes ?? 15), 0) * 60000,
+          ).toISOString();
           const { data: callRow, error: callError } = await supabase
             .from("call_queue")
-            .insert({
-              clinic_id: row.communication_event_id ? (await supabase.from("sms_queue").select("clinic_id").eq("id", row.id).single()).data?.clinic_id : null,
-              appointment_id: escalation.appointment_id,
-              communication_event_id: row.communication_event_id,
-              recipient_role: "parent",
-              recipient_phone: row.recipient_phone,
-              call_type: "escalation",
-              scheduled_for: callAt,
-            } as never)
+            .upsert(
+              {
+                clinic_id: row.clinic_id,
+                appointment_id: escalation.appointment_id,
+                communication_event_id: row.communication_event_id,
+                recipient_role: "parent",
+                recipient_phone: row.recipient_phone,
+                call_type: "escalation",
+                scheduled_for: callAt,
+                status: "queued",
+                attempts: 0,
+                last_error: null,
+              } as never,
+              { onConflict: "communication_event_id,call_type,recipient_role" },
+            )
             .select("id,scheduled_for")
             .single();
           if (callError) throw callError;
