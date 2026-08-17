@@ -44,6 +44,13 @@ export type CallQueueRow = {
 
 export const MAX_ATTEMPTS = 3;
 
+type RpcResponse<T> = { data: T; error: { message: string } | null };
+
+const callRpc = supabase.rpc as unknown as (
+  fn: string,
+  args: Record<string, unknown>,
+) => Promise<RpcResponse<unknown>>;
+
 export function isNativeDevice() {
   return Capacitor.isNativePlatform();
 }
@@ -111,15 +118,14 @@ function errorMessage(err: unknown) {
 
 async function escalationIsActive(eventId: string | null, stage: "sms" | "call") {
   if (!eventId) return true;
-  const { data, error } = await supabase
-    .from("communication_escalations")
-    .select("status,current_stage")
-    .eq("id", eventId)
-    .maybeSingle();
-  if (error) throw error;
+  const { data, error } = await callRpc("get_communication_escalation_state", {
+    p_escalation_id: eventId,
+  });
+  if (error) throw new Error(error.message);
+  const state = data as { status?: string } | null;
   return stage === "sms"
-    ? data?.status === "waiting_whatsapp" || data?.status === "waiting_sms"
-    : data?.status === "waiting_call";
+    ? state?.status === "waiting_whatsapp" || state?.status === "waiting_sms"
+    : state?.status === "waiting_call";
 }
 
 async function failSms(row: SmsQueueRow, message: string) {
@@ -165,72 +171,40 @@ export async function sendQueuedSms(row: SmsQueueRow) {
 
   try {
     if (!(await escalationIsActive(row.communication_event_id, "sms"))) {
-      await supabase.from("sms_queue").update({ status: "cancelled", last_error: "Communication escalation was cancelled" }).eq("id", row.id).eq("status", "sending");
+      await supabase
+        .from("sms_queue")
+        .update({ status: "cancelled", last_error: "Communication escalation was cancelled" })
+        .eq("id", row.id)
+        .eq("status", "sending");
       return { skipped: true as const };
     }
     if (!isNativeDevice()) throw new Error("SMS can only be sent from the centre's Android device.");
-    const result = await SmsBridge.send({ phone: normalizePhone(row.recipient_phone), message: row.message });
+
+    const result = await SmsBridge.send({
+      phone: normalizePhone(row.recipient_phone),
+      message: row.message,
+    });
     if (!result.queued) throw new Error("The device did not accept the SMS for sending.");
 
     const sentAt = new Date().toISOString();
     await supabase
       .from("sms_queue")
-      .update({ status: "sent", attempts: row.attempts + 1, sent_at: sentAt, last_error: null })
+      .update({
+        status: "sent",
+        attempts: row.attempts + 1,
+        sent_at: sentAt,
+        last_error: null,
+      })
       .eq("id", row.id);
 
     if (row.message_type === "escalation_fallback" && row.communication_event_id) {
-      const { data: escalation, error: escalationError } = await supabase
-        .from("communication_escalations")
-        .select("id,appointment_id,status")
-        .eq("id", row.communication_event_id)
-        .maybeSingle();
-      if (escalationError) throw escalationError;
-
-      if (escalation?.status === "waiting_whatsapp" || escalation?.status === "waiting_sms") {
-        const { data: clinic, error: clinicError } = await supabase
-          .from("clinics")
-          .select("call_enabled,sms_to_call_wait_minutes")
-          .eq("id", row.clinic_id)
-          .maybeSingle();
-        if (clinicError) throw clinicError;
-
-        if (clinic?.call_enabled ?? true) {
-          const callAt = new Date(
-            new Date(sentAt).getTime() + Math.max(Number(clinic?.sms_to_call_wait_minutes ?? 15), 0) * 60000,
-          ).toISOString();
-          const { data: callRow, error: callError } = await supabase
-            .from("call_queue")
-            .upsert(
-              {
-                clinic_id: row.clinic_id,
-                appointment_id: escalation.appointment_id,
-                communication_event_id: row.communication_event_id,
-                recipient_role: "parent",
-                recipient_phone: row.recipient_phone,
-                call_type: "escalation",
-                scheduled_for: callAt,
-                status: "queued",
-                attempts: 0,
-                last_error: null,
-              } as never,
-              { onConflict: "communication_event_id,call_type,recipient_role" },
-            )
-            .select("id,scheduled_for")
-            .single();
-          if (callError) throw callError;
-          await supabase
-            .from("communication_escalations")
-            .update({ status: "waiting_call", current_stage: "call", call_queue_id: callRow.id, call_scheduled_for: callRow.scheduled_for })
-            .eq("id", row.communication_event_id)
-            .in("status", ["waiting_whatsapp", "waiting_sms"]);
-        } else {
-          await supabase
-            .from("communication_escalations")
-            .update({ status: "completed", current_stage: "completed", completed_at: sentAt })
-            .eq("id", row.communication_event_id)
-            .in("status", ["waiting_whatsapp", "waiting_sms"]);
-        }
-      }
+      const { data, error } = await callRpc("advance_communication_after_sms", {
+        p_escalation_id: row.communication_event_id,
+        p_sent_at: sentAt,
+      });
+      if (error) throw new Error(error.message);
+      const resultState = data as { ok?: boolean; reason?: string } | null;
+      if (resultState?.ok === false) throw new Error(resultState.reason ?? "Unable to advance communication escalation");
     }
 
     return { skipped: false as const };
@@ -243,12 +217,19 @@ export async function sendQueuedSms(row: SmsQueueRow) {
 /** Places one queued cellular call through the centre device. */
 export async function placeQueuedCall(row: CallQueueRow) {
   if (!isValidPhone(row.recipient_phone)) {
-    await supabase.from("call_queue").update({ status: "failed", last_error: "Invalid recipient phone number" }).eq("id", row.id);
+    await supabase
+      .from("call_queue")
+      .update({ status: "failed", last_error: "Invalid recipient phone number" })
+      .eq("id", row.id);
     throw new Error("Invalid recipient phone number");
   }
 
   if (!(await escalationIsActive(row.communication_event_id, "call"))) {
-    await supabase.from("call_queue").update({ status: "cancelled", last_error: "Communication escalation is no longer active" }).eq("id", row.id).eq("status", "queued");
+    await supabase
+      .from("call_queue")
+      .update({ status: "cancelled", last_error: "Communication escalation is no longer active" })
+      .eq("id", row.id)
+      .eq("status", "queued");
     return { skipped: true as const };
   }
 
@@ -263,9 +244,14 @@ export async function placeQueuedCall(row: CallQueueRow) {
 
   try {
     if (!(await escalationIsActive(row.communication_event_id, "call"))) {
-      await supabase.from("call_queue").update({ status: "cancelled", last_error: "Communication escalation was cancelled" }).eq("id", row.id).eq("status", "dialing");
+      await supabase
+        .from("call_queue")
+        .update({ status: "cancelled", last_error: "Communication escalation was cancelled" })
+        .eq("id", row.id)
+        .eq("status", "dialing");
       return { skipped: true as const };
     }
+
     const phone = normalizePhone(row.recipient_phone);
     if (isNativeDevice()) {
       const result = await SmsBridge.call({ phone });
@@ -273,15 +259,39 @@ export async function placeQueuedCall(row: CallQueueRow) {
     } else {
       window.location.href = `tel:${phone}`;
     }
+
     const dialedAt = new Date().toISOString();
-    await supabase.from("call_queue").update({ status: "completed", attempts: row.attempts + 1, dialed_at: dialedAt, last_error: null }).eq("id", row.id);
+    await supabase
+      .from("call_queue")
+      .update({
+        status: "completed",
+        attempts: row.attempts + 1,
+        dialed_at: dialedAt,
+        last_error: null,
+      })
+      .eq("id", row.id);
+
     if (row.communication_event_id && row.call_type === "escalation") {
-      await supabase.from("communication_escalations").update({ status: "completed", current_stage: "completed", completed_at: dialedAt }).eq("id", row.communication_event_id).eq("status", "waiting_call");
+      const { data, error } = await callRpc("complete_communication_after_call", {
+        p_escalation_id: row.communication_event_id,
+        p_dialed_at: dialedAt,
+      });
+      if (error) throw new Error(error.message);
+      if (data !== true) throw new Error("Communication escalation was no longer waiting for the final call");
     }
+
     return { skipped: false as const };
   } catch (err) {
     const attempts = row.attempts + 1;
-    await supabase.from("call_queue").update({ status: attempts >= MAX_ATTEMPTS ? "failed" : "queued", attempts, last_error: errorMessage(err) }).eq("id", row.id).eq("status", "dialing");
+    await supabase
+      .from("call_queue")
+      .update({
+        status: attempts >= MAX_ATTEMPTS ? "failed" : "queued",
+        attempts,
+        last_error: errorMessage(err),
+      })
+      .eq("id", row.id)
+      .eq("status", "dialing");
     throw err;
   }
 }
@@ -289,8 +299,16 @@ export async function placeQueuedCall(row: CallQueueRow) {
 export type QueueRunResult = { processed: number; sent: number; failed: number; errors: string[] };
 
 export async function processDueSmsQueue(clinicId: string, limit = 20): Promise<QueueRunResult> {
-  const { data, error } = await supabase.from("sms_queue").select("*").eq("clinic_id", clinicId).eq("status", "queued").lte("scheduled_for", new Date().toISOString()).order("scheduled_for", { ascending: true }).limit(limit);
+  const { data, error } = await supabase
+    .from("sms_queue")
+    .select("*")
+    .eq("clinic_id", clinicId)
+    .eq("status", "queued")
+    .lte("scheduled_for", new Date().toISOString())
+    .order("scheduled_for", { ascending: true })
+    .limit(limit);
   if (error) throw error;
+
   const rows = (data ?? []) as unknown as SmsQueueRow[];
   const result: QueueRunResult = { processed: 0, sent: 0, failed: 0, errors: [] };
   for (const row of rows) {
@@ -307,8 +325,16 @@ export async function processDueSmsQueue(clinicId: string, limit = 20): Promise<
 }
 
 export async function processDueCallQueue(clinicId: string, limit = 5): Promise<QueueRunResult> {
-  const { data, error } = await supabase.from("call_queue").select("*").eq("clinic_id", clinicId).eq("status", "queued").lte("scheduled_for", new Date().toISOString()).order("scheduled_for", { ascending: true }).limit(limit);
+  const { data, error } = await supabase
+    .from("call_queue")
+    .select("*")
+    .eq("clinic_id", clinicId)
+    .eq("status", "queued")
+    .lte("scheduled_for", new Date().toISOString())
+    .order("scheduled_for", { ascending: true })
+    .limit(limit);
   if (error) throw error;
+
   const rows = (data ?? []) as unknown as CallQueueRow[];
   const result: QueueRunResult = { processed: 0, sent: 0, failed: 0, errors: [] };
   for (const row of rows) {
