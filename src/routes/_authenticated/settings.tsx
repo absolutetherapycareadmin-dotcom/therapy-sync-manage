@@ -109,16 +109,19 @@ type CommunicationSettings = {
   whatsapp_escalation_enabled: boolean;
   whatsapp_to_sms_wait_minutes: number;
   sms_to_call_wait_minutes: number;
+  communication_working_hours_enabled: boolean;
+  communication_working_hours_start: string;
+  communication_working_hours_end: string;
 };
 
 function CommunicationDeviceSection() {
   const { clinic, clinicId, refresh } = useAuth();
-  const [device, setDevice] = useState<CommunicationSettings>({ device_phone: "", device_label: "", sms_enabled: true, call_enabled: true, reminder_lead_minutes: 30, whatsapp_escalation_enabled: true, whatsapp_to_sms_wait_minutes: 60, sms_to_call_wait_minutes: 15 });
+  const [device, setDevice] = useState<CommunicationSettings>({ device_phone: "", device_label: "", sms_enabled: true, call_enabled: true, reminder_lead_minutes: 30, whatsapp_escalation_enabled: true, whatsapp_to_sms_wait_minutes: 60, sms_to_call_wait_minutes: 15, communication_working_hours_enabled: false, communication_working_hours_start: "08:00", communication_working_hours_end: "20:00" });
 
   useEffect(() => {
     if (clinic) {
       const c = clinic as typeof clinic & Partial<CommunicationSettings>;
-      setDevice({ device_phone: c.device_phone ?? "", device_label: c.device_label ?? "", sms_enabled: c.sms_enabled ?? true, call_enabled: c.call_enabled ?? true, reminder_lead_minutes: c.reminder_lead_minutes ?? 30, whatsapp_escalation_enabled: c.whatsapp_escalation_enabled ?? true, whatsapp_to_sms_wait_minutes: c.whatsapp_to_sms_wait_minutes ?? 60, sms_to_call_wait_minutes: c.sms_to_call_wait_minutes ?? 15 });
+      setDevice({ device_phone: c.device_phone ?? "", device_label: c.device_label ?? "", sms_enabled: c.sms_enabled ?? true, call_enabled: c.call_enabled ?? true, reminder_lead_minutes: c.reminder_lead_minutes ?? 30, whatsapp_escalation_enabled: c.whatsapp_escalation_enabled ?? true, whatsapp_to_sms_wait_minutes: c.whatsapp_to_sms_wait_minutes ?? 60, sms_to_call_wait_minutes: c.sms_to_call_wait_minutes ?? 15, communication_working_hours_enabled: c.communication_working_hours_enabled ?? false, communication_working_hours_start: c.communication_working_hours_start?.slice(0, 5) ?? "08:00", communication_working_hours_end: c.communication_working_hours_end?.slice(0, 5) ?? "20:00" });
     }
   }, [clinic]);
 
@@ -132,7 +135,8 @@ function CommunicationDeviceSection() {
       if (!Number.isFinite(lead) || lead < 5 || lead > 240) throw new Error("Reminder lead time must be between 5 and 240 minutes");
       if (!Number.isFinite(waWait) || waWait < 0 || waWait > 10080) throw new Error("WhatsApp → SMS wait must be between 0 and 10080 minutes");
       if (!Number.isFinite(smsWait) || smsWait < 0 || smsWait > 10080) throw new Error("SMS → Call wait must be between 0 and 10080 minutes");
-      const { error } = await supabase.from("clinics").update({ device_phone: phone || null, device_label: device.device_label.trim() || null, sms_enabled: device.sms_enabled, call_enabled: device.call_enabled, reminder_lead_minutes: Math.round(lead), whatsapp_escalation_enabled: device.whatsapp_escalation_enabled, whatsapp_to_sms_wait_minutes: Math.round(waWait), sms_to_call_wait_minutes: Math.round(smsWait) } as never).eq("id", clinicId as string);
+      if (device.communication_working_hours_enabled && device.communication_working_hours_start >= device.communication_working_hours_end) throw new Error("Working-hours start must be earlier than end");
+      const { error } = await supabase.from("clinics").update({ device_phone: phone || null, device_label: device.device_label.trim() || null, sms_enabled: device.sms_enabled, call_enabled: device.call_enabled, reminder_lead_minutes: Math.round(lead), whatsapp_escalation_enabled: device.whatsapp_escalation_enabled, whatsapp_to_sms_wait_minutes: Math.round(waWait), sms_to_call_wait_minutes: Math.round(smsWait), communication_working_hours_enabled: device.communication_working_hours_enabled, communication_working_hours_start: device.communication_working_hours_start, communication_working_hours_end: device.communication_working_hours_end } as never).eq("id", clinicId as string);
       if (error) throw error;
       await refresh();
     },
@@ -154,6 +158,14 @@ function CommunicationDeviceSection() {
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="size-4 accent-primary" checked={device.whatsapp_escalation_enabled} onChange={(e) => setDevice({ ...device, whatsapp_escalation_enabled: e.target.checked })} />WhatsApp escalation</label>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="size-4 accent-primary" checked={device.sms_enabled} onChange={(e) => setDevice({ ...device, sms_enabled: e.target.checked })} />SMS fallback</label>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="size-4 accent-primary" checked={device.call_enabled} onChange={(e) => setDevice({ ...device, call_enabled: e.target.checked })} />Call fallback / reminders</label>
+        </div>
+      </div>
+      <div className="mt-5 rounded-lg border p-4">
+        <div className="flex items-center gap-2"><input id="working-hours-enabled" type="checkbox" className="size-4 accent-primary" checked={device.communication_working_hours_enabled} onChange={(e) => setDevice({ ...device, communication_working_hours_enabled: e.target.checked })} /><Label htmlFor="working-hours-enabled">Respect centre communication working hours</Label></div>
+        <p className="mt-1 text-xs text-muted-foreground">When enabled, queued SMS/call execution waits until the configured local centre window.</p>
+        <div className="mt-3 grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2"><Label>Working hours start</Label><Input type="time" value={device.communication_working_hours_start} disabled={!device.communication_working_hours_enabled} onChange={(e) => setDevice({ ...device, communication_working_hours_start: e.target.value })} /></div>
+          <div className="space-y-2"><Label>Working hours end</Label><Input type="time" value={device.communication_working_hours_end} disabled={!device.communication_working_hours_enabled} onChange={(e) => setDevice({ ...device, communication_working_hours_end: e.target.value })} /></div>
         </div>
       </div>
       <div className="mt-4"><Button onClick={() => save.mutate()} disabled={save.isPending}>Save communication settings</Button></div>
