@@ -307,10 +307,14 @@ export type Database = {
           address: string | null
           call_enabled: boolean
           city: string | null
+          communication_working_hours_enabled: boolean
+          communication_working_hours_end: string
+          communication_working_hours_start: string
           created_at: string
           currency: string
           device_label: string | null
           device_phone: string | null
+          device_subscription_id: number | null
           email: string | null
           id: string
           name: string
@@ -322,16 +326,21 @@ export type Database = {
           timezone: string
           updated_at: string
           whatsapp_escalation_enabled: boolean
+          whatsapp_mode: string
           whatsapp_to_sms_wait_minutes: number
         }
         Insert: {
           address?: string | null
           call_enabled?: boolean
           city?: string | null
+          communication_working_hours_enabled?: boolean
+          communication_working_hours_end?: string
+          communication_working_hours_start?: string
           created_at?: string
           currency?: string
           device_label?: string | null
           device_phone?: string | null
+          device_subscription_id?: number | null
           email?: string | null
           id?: string
           name: string
@@ -343,16 +352,21 @@ export type Database = {
           timezone?: string
           updated_at?: string
           whatsapp_escalation_enabled?: boolean
+          whatsapp_mode?: string
           whatsapp_to_sms_wait_minutes?: number
         }
         Update: {
           address?: string | null
           call_enabled?: boolean
           city?: string | null
+          communication_working_hours_enabled?: boolean
+          communication_working_hours_end?: string
+          communication_working_hours_start?: string
           created_at?: string
           currency?: string
           device_label?: string | null
           device_phone?: string | null
+          device_subscription_id?: number | null
           email?: string | null
           id?: string
           name?: string
@@ -364,6 +378,7 @@ export type Database = {
           timezone?: string
           updated_at?: string
           whatsapp_escalation_enabled?: boolean
+          whatsapp_mode?: string
           whatsapp_to_sms_wait_minutes?: number
         }
         Relationships: []
@@ -926,6 +941,8 @@ export type Database = {
           message_type: string
           metadata: Json | null
           phone: string
+          provider_message_id: string | null
+          provider_status: string | null
           read_at: string | null
           recipient_name: string | null
           recipient_role: string
@@ -946,6 +963,8 @@ export type Database = {
           message_type?: string
           metadata?: Json | null
           phone: string
+          provider_message_id?: string | null
+          provider_status?: string | null
           read_at?: string | null
           recipient_name?: string | null
           recipient_role?: string
@@ -966,6 +985,8 @@ export type Database = {
           message_type?: string
           metadata?: Json | null
           phone?: string
+          provider_message_id?: string | null
+          provider_status?: string | null
           read_at?: string | null
           recipient_name?: string | null
           recipient_role?: string
@@ -1004,6 +1025,44 @@ export type Database = {
           },
         ]
       }
+      whatsapp_provider_events: {
+        Row: {
+          clinic_id: string | null
+          event_type: string
+          id: string
+          payload: Json
+          provider_message_id: string | null
+          received_at: string
+          signature_valid: boolean
+        }
+        Insert: {
+          clinic_id?: string | null
+          event_type: string
+          id?: string
+          payload?: Json
+          provider_message_id?: string | null
+          received_at?: string
+          signature_valid?: boolean
+        }
+        Update: {
+          clinic_id?: string | null
+          event_type?: string
+          id?: string
+          payload?: Json
+          provider_message_id?: string | null
+          received_at?: string
+          signature_valid?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_provider_events_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -1013,6 +1072,10 @@ export type Database = {
         Args: { p_escalation_id: string; p_sent_at: string }
         Returns: Json
       }
+      cancel_communication_escalation: {
+        Args: { p_escalation_id: string; p_reason?: string }
+        Returns: boolean
+      }
       complete_communication_after_call: {
         Args: { p_dialed_at: string; p_escalation_id: string }
         Returns: boolean
@@ -1020,6 +1083,10 @@ export type Database = {
       get_communication_escalation_state: {
         Args: { p_escalation_id: string }
         Returns: Json
+      }
+      is_communication_within_working_hours: {
+        Args: { p_at?: string; p_clinic_id: string }
+        Returns: boolean
       }
       is_valid_phone: { Args: { p_phone: string }; Returns: boolean }
       normalize_phone: { Args: { p_phone: string }; Returns: string }
@@ -1034,6 +1101,10 @@ export type Database = {
           p_sender_phone: string
         }
         Returns: Json
+      }
+      set_whatsapp_mode: {
+        Args: { p_clinic_id: string; p_mode: string }
+        Returns: boolean
       }
       start_appointment_communication_workflow: {
         Args: { p_appointment_id: string; p_event_key: string }
