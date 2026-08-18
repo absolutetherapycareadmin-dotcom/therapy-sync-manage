@@ -173,6 +173,7 @@ export type Database = {
           attempts: number
           call_type: string
           clinic_id: string
+          communication_event_id: string | null
           created_at: string
           dialed_at: string | null
           id: string
@@ -188,6 +189,7 @@ export type Database = {
           attempts?: number
           call_type?: string
           clinic_id: string
+          communication_event_id?: string | null
           created_at?: string
           dialed_at?: string | null
           id?: string
@@ -203,6 +205,7 @@ export type Database = {
           attempts?: number
           call_type?: string
           clinic_id?: string
+          communication_event_id?: string | null
           created_at?: string
           dialed_at?: string | null
           id?: string
@@ -226,6 +229,13 @@ export type Database = {
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_queue_communication_event_id_fkey"
+            columns: ["communication_event_id"]
+            isOneToOne: false
+            referencedRelation: "communication_escalations"
             referencedColumns: ["id"]
           },
         ]
@@ -308,8 +318,11 @@ export type Database = {
           phone: string | null
           reminder_lead_minutes: number
           sms_enabled: boolean
+          sms_to_call_wait_minutes: number
           timezone: string
           updated_at: string
+          whatsapp_escalation_enabled: boolean
+          whatsapp_to_sms_wait_minutes: number
         }
         Insert: {
           address?: string | null
@@ -326,8 +339,11 @@ export type Database = {
           phone?: string | null
           reminder_lead_minutes?: number
           sms_enabled?: boolean
+          sms_to_call_wait_minutes?: number
           timezone?: string
           updated_at?: string
+          whatsapp_escalation_enabled?: boolean
+          whatsapp_to_sms_wait_minutes?: number
         }
         Update: {
           address?: string | null
@@ -344,10 +360,91 @@ export type Database = {
           phone?: string | null
           reminder_lead_minutes?: number
           sms_enabled?: boolean
+          sms_to_call_wait_minutes?: number
           timezone?: string
           updated_at?: string
+          whatsapp_escalation_enabled?: boolean
+          whatsapp_to_sms_wait_minutes?: number
         }
         Relationships: []
+      }
+      communication_escalations: {
+        Row: {
+          appointment_id: string
+          call_queue_id: string | null
+          call_scheduled_for: string | null
+          cancel_reason: string | null
+          cancelled_at: string | null
+          clinic_id: string
+          completed_at: string | null
+          created_at: string
+          current_stage: string
+          event_key: string
+          id: string
+          response_action: string | null
+          sms_queue_id: string | null
+          sms_scheduled_for: string | null
+          started_at: string
+          status: string
+          updated_at: string
+          whatsapp_message_id: string | null
+        }
+        Insert: {
+          appointment_id: string
+          call_queue_id?: string | null
+          call_scheduled_for?: string | null
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          clinic_id: string
+          completed_at?: string | null
+          created_at?: string
+          current_stage?: string
+          event_key: string
+          id?: string
+          response_action?: string | null
+          sms_queue_id?: string | null
+          sms_scheduled_for?: string | null
+          started_at?: string
+          status?: string
+          updated_at?: string
+          whatsapp_message_id?: string | null
+        }
+        Update: {
+          appointment_id?: string
+          call_queue_id?: string | null
+          call_scheduled_for?: string | null
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          clinic_id?: string
+          completed_at?: string | null
+          created_at?: string
+          current_stage?: string
+          event_key?: string
+          id?: string
+          response_action?: string | null
+          sms_queue_id?: string | null
+          sms_scheduled_for?: string | null
+          started_at?: string
+          status?: string
+          updated_at?: string
+          whatsapp_message_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "communication_escalations_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "communication_escalations_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notifications: {
         Row: {
@@ -595,6 +692,7 @@ export type Database = {
           appointment_id: string | null
           attempts: number
           clinic_id: string
+          communication_event_id: string | null
           created_at: string
           id: string
           last_error: string | null
@@ -611,6 +709,7 @@ export type Database = {
           appointment_id?: string | null
           attempts?: number
           clinic_id: string
+          communication_event_id?: string | null
           created_at?: string
           id?: string
           last_error?: string | null
@@ -627,6 +726,7 @@ export type Database = {
           appointment_id?: string | null
           attempts?: number
           clinic_id?: string
+          communication_event_id?: string | null
           created_at?: string
           id?: string
           last_error?: string | null
@@ -652,6 +752,13 @@ export type Database = {
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_queue_communication_event_id_fkey"
+            columns: ["communication_event_id"]
+            isOneToOne: false
+            referencedRelation: "communication_escalations"
             referencedColumns: ["id"]
           },
         ]
@@ -749,6 +856,7 @@ export type Database = {
           appointment_id: string | null
           child_id: string | null
           clinic_id: string
+          communication_event_id: string | null
           created_at: string
           delivered_at: string | null
           error_message: string | null
@@ -768,6 +876,7 @@ export type Database = {
           appointment_id?: string | null
           child_id?: string | null
           clinic_id: string
+          communication_event_id?: string | null
           created_at?: string
           delivered_at?: string | null
           error_message?: string | null
@@ -787,6 +896,7 @@ export type Database = {
           appointment_id?: string | null
           child_id?: string | null
           clinic_id?: string
+          communication_event_id?: string | null
           created_at?: string
           delivered_at?: string | null
           error_message?: string | null
@@ -824,6 +934,13 @@ export type Database = {
             referencedRelation: "clinics"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "whatsapp_messages_communication_event_id_fkey"
+            columns: ["communication_event_id"]
+            isOneToOne: false
+            referencedRelation: "communication_escalations"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
@@ -836,6 +953,10 @@ export type Database = {
       process_mock_parent_action: {
         Args: { p_action: string; p_appointment_id: string; p_note?: string }
         Returns: Json
+      }
+      start_appointment_communication_workflow: {
+        Args: { p_appointment_id: string; p_event_key: string }
+        Returns: string
       }
     }
     Enums: {
