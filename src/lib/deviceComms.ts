@@ -11,7 +11,8 @@ export type CallQueueRow = {
 };
 export const MAX_ATTEMPTS = 3;
 type RpcResponse<T> = { data: T; error: { message: string } | null };
-const callRpc = supabase.rpc as unknown as (fn: string, args: Record<string, unknown>) => Promise<RpcResponse<unknown>>;
+// supabase.rpc reads `this.rest` internally, so it must stay bound to the client.
+const callRpc = supabase.rpc.bind(supabase) as unknown as (fn: string, args: Record<string, unknown>) => Promise<RpcResponse<unknown>>;
 
 export function isNativeDevice() { return Capacitor.isNativePlatform(); }
 export function normalizePhone(phone: string) { return phone.replace(/[^\d+]/g, ""); }
