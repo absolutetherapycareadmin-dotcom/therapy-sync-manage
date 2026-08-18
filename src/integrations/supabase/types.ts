@@ -948,6 +948,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      advance_communication_after_sms: {
+        Args: { p_escalation_id: string; p_sent_at: string }
+        Returns: Json
+      }
+      complete_communication_after_call: {
+        Args: { p_dialed_at: string; p_escalation_id: string }
+        Returns: boolean
+      }
+      get_communication_escalation_state: {
+        Args: { p_escalation_id: string }
+        Returns: Json
+      }
       is_valid_phone: { Args: { p_phone: string }; Returns: boolean }
       normalize_phone: { Args: { p_phone: string }; Returns: string }
       process_mock_parent_action: {
