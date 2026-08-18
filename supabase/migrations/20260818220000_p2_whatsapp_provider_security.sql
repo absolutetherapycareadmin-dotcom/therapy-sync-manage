@@ -2,9 +2,8 @@
 -- provider identifiers are authoritative, and webhook audit rows never become
 -- unscoped cross-tenant records.
 
-ALTER TABLE public.whatsapp_messages
-  ADD CONSTRAINT whatsapp_messages_provider_message_id_unique
-  UNIQUE (provider_message_id);
+-- provider_message_id uniqueness is established by the earlier
+-- 20260818033342_db20279d-3e32-4111-9209-e09be5fca077 migration.
 
 ALTER TABLE public.whatsapp_messages
   DROP CONSTRAINT IF EXISTS whatsapp_messages_provider_status_check;
