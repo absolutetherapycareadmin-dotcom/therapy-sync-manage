@@ -304,6 +304,7 @@ END;
 $$;
 
 DROP TRIGGER IF EXISTS appointments_cancel_communications ON public.appointments;
+DROP TRIGGER IF EXISTS appointments_communication_change ON public.appointments;
 CREATE TRIGGER appointments_communication_change
 AFTER UPDATE OF status, appointment_date, start_time ON public.appointments
 FOR EACH ROW EXECUTE FUNCTION public.handle_appointment_communication_change();
