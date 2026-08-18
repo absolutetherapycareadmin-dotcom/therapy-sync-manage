@@ -28,7 +28,8 @@ export const Route = createFileRoute("/_authenticated/whatsapp")({ head: () => (
 const NONE = "__none__";
 const TYPES = ["reminder", "confirmation", "payment", "general"];
 type RpcResult = { data: unknown; error: { message: string } | null };
-function callMockParentAction(appointmentId: string, action: string, note?: string) { const rpc = supabase.rpc as unknown as (fn: string, args: Record<string, unknown>) => Promise<RpcResult>; return rpc("process_mock_parent_action", { p_appointment_id: appointmentId, p_action: action, p_note: note ?? null }); }
+// supabase.rpc reads `this.rest` internally, so keep it bound to the client.
+function callMockParentAction(appointmentId: string, action: string, note?: string) { const rpc = supabase.rpc.bind(supabase) as unknown as (fn: string, args: Record<string, unknown>) => Promise<RpcResult>; return rpc("process_mock_parent_action", { p_appointment_id: appointmentId, p_action: action, p_note: note ?? null }); }
 
 function WhatsappPage() {
   const { clinicId, clinic } = useAuth();
