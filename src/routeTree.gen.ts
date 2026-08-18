@@ -25,6 +25,7 @@ import { Route as AuthenticatedRoomsRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedTherapistsRouteImport } from './routes/_authenticated/therapists'
 import { Route as AuthenticatedWhatsappRouteImport } from './routes/_authenticated/whatsapp'
+import { Route as AuthenticatedWhatsappProviderRouteImport } from './routes/_authenticated/whatsapp-provider'
 import { Route as AuthenticatedChildrenIndexRouteImport } from './routes/_authenticated/children.index'
 import { Route as AuthenticatedChildrenChildIdRouteImport } from './routes/_authenticated/children.$childId'
 
@@ -110,6 +111,12 @@ const AuthenticatedWhatsappRoute = AuthenticatedWhatsappRouteImport.update({
   path: '/whatsapp',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedWhatsappProviderRoute =
+  AuthenticatedWhatsappProviderRouteImport.update({
+    id: '/whatsapp-provider',
+    path: '/whatsapp-provider',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedChildrenIndexRoute =
   AuthenticatedChildrenIndexRouteImport.update({
     id: '/children/',
@@ -139,6 +146,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/therapists': typeof AuthenticatedTherapistsRoute
   '/whatsapp': typeof AuthenticatedWhatsappRoute
+  '/whatsapp-provider': typeof AuthenticatedWhatsappProviderRoute
   '/children/$childId': typeof AuthenticatedChildrenChildIdRoute
   '/children/': typeof AuthenticatedChildrenIndexRoute
 }
@@ -158,6 +166,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsRoute
   '/therapists': typeof AuthenticatedTherapistsRoute
   '/whatsapp': typeof AuthenticatedWhatsappRoute
+  '/whatsapp-provider': typeof AuthenticatedWhatsappProviderRoute
   '/children/$childId': typeof AuthenticatedChildrenChildIdRoute
   '/children': typeof AuthenticatedChildrenIndexRoute
 }
@@ -179,6 +188,7 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/therapists': typeof AuthenticatedTherapistsRoute
   '/_authenticated/whatsapp': typeof AuthenticatedWhatsappRoute
+  '/_authenticated/whatsapp-provider': typeof AuthenticatedWhatsappProviderRoute
   '/_authenticated/children/$childId': typeof AuthenticatedChildrenChildIdRoute
   '/_authenticated/children/': typeof AuthenticatedChildrenIndexRoute
 }
@@ -200,6 +210,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/therapists'
     | '/whatsapp'
+    | '/whatsapp-provider'
     | '/children/$childId'
     | '/children/'
   fileRoutesByTo: FileRoutesByTo
@@ -219,6 +230,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/therapists'
     | '/whatsapp'
+    | '/whatsapp-provider'
     | '/children/$childId'
     | '/children'
   id:
@@ -239,6 +251,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings'
     | '/_authenticated/therapists'
     | '/_authenticated/whatsapp'
+    | '/_authenticated/whatsapp-provider'
     | '/_authenticated/children/$childId'
     | '/_authenticated/children/'
   fileRoutesById: FileRoutesById
@@ -364,6 +377,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWhatsappRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/whatsapp-provider': {
+      id: '/_authenticated/whatsapp-provider'
+      path: '/whatsapp-provider'
+      fullPath: '/whatsapp-provider'
+      preLoaderRoute: typeof AuthenticatedWhatsappProviderRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/children/': {
       id: '/_authenticated/children/'
       path: '/children'
@@ -394,6 +414,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedTherapistsRoute: typeof AuthenticatedTherapistsRoute
   AuthenticatedWhatsappRoute: typeof AuthenticatedWhatsappRoute
+  AuthenticatedWhatsappProviderRoute: typeof AuthenticatedWhatsappProviderRoute
   AuthenticatedChildrenChildIdRoute: typeof AuthenticatedChildrenChildIdRoute
   AuthenticatedChildrenIndexRoute: typeof AuthenticatedChildrenIndexRoute
 }
@@ -411,6 +432,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedTherapistsRoute: AuthenticatedTherapistsRoute,
   AuthenticatedWhatsappRoute: AuthenticatedWhatsappRoute,
+  AuthenticatedWhatsappProviderRoute: AuthenticatedWhatsappProviderRoute,
   AuthenticatedChildrenChildIdRoute: AuthenticatedChildrenChildIdRoute,
   AuthenticatedChildrenIndexRoute: AuthenticatedChildrenIndexRoute,
 }

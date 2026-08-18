@@ -11,7 +11,8 @@ export type CallQueueRow = {
 };
 export const MAX_ATTEMPTS = 3;
 type RpcResponse<T> = { data: T; error: { message: string } | null };
-const callRpc = supabase.rpc as unknown as (fn: string, args: Record<string, unknown>) => Promise<RpcResponse<unknown>>;
+// supabase.rpc reads `this.rest` internally, so it must stay bound to the client.
+const callRpc = supabase.rpc.bind(supabase) as unknown as (fn: string, args: Record<string, unknown>) => Promise<RpcResponse<unknown>>;
 
 export function isNativeDevice() { return Capacitor.isNativePlatform(); }
 export function normalizePhone(phone: string) { return phone.replace(/[^\d+]/g, ""); }
@@ -79,7 +80,7 @@ export async function sendQueuedSms(row: SmsQueueRow, subscriptionId?: number) {
     if (!(await escalationIsActive(row.communication_event_id, "sms"))) { await supabase.from("sms_queue").update({ status: "cancelled", last_error: "Communication escalation was cancelled" }).eq("id", row.id).eq("status", "sending"); return { skipped: true as const }; }
     if (!(await withinWorkingHours(row.clinic_id))) { await supabase.from("sms_queue").update({ status: "queued", last_error: "Centre communication working hours are closed" }).eq("id", row.id).eq("status", "sending"); return { skipped: true as const }; }
     if (!isNativeDevice()) throw new Error("SMS can only be sent from the centre's Android device.");
-    const result = await SmsBridge.send({ phone: normalizePhone(row.recipient_phone), message: row.message, subscriptionId });
+    const result = await SmsBridge.send({ phone: normalizePhone(row.recipient_phone), message: row.message, ...(subscriptionId === undefined ? {} : { subscriptionId }) });
     if (!result.queued) throw new Error("The device did not accept the SMS for sending.");
     const sentAt = new Date().toISOString();
     await supabase.from("sms_queue").update({ status: "sent", attempts: row.attempts + 1, sent_at: sentAt, last_error: null }).eq("id", row.id);
