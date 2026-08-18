@@ -383,6 +383,7 @@ export type Database = {
           id: string
           response_action: string | null
           sms_queue_id: string | null
+          sms_response_token: string | null
           sms_scheduled_for: string | null
           started_at: string
           status: string
@@ -403,6 +404,7 @@ export type Database = {
           id?: string
           response_action?: string | null
           sms_queue_id?: string | null
+          sms_response_token?: string | null
           sms_scheduled_for?: string | null
           started_at?: string
           status?: string
@@ -423,6 +425,7 @@ export type Database = {
           id?: string
           response_action?: string | null
           sms_queue_id?: string | null
+          sms_response_token?: string | null
           sms_scheduled_for?: string | null
           started_at?: string
           status?: string
@@ -442,6 +445,64 @@ export type Database = {
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      communication_sms_responses: {
+        Row: {
+          appointment_id: string
+          clinic_id: string
+          communication_event_id: string
+          created_at: string
+          id: string
+          message: string
+          received_at: string
+          response_hash: string
+          sender_phone: string
+        }
+        Insert: {
+          appointment_id: string
+          clinic_id: string
+          communication_event_id: string
+          created_at?: string
+          id?: string
+          message: string
+          received_at?: string
+          response_hash: string
+          sender_phone: string
+        }
+        Update: {
+          appointment_id?: string
+          clinic_id?: string
+          communication_event_id?: string
+          created_at?: string
+          id?: string
+          message?: string
+          received_at?: string
+          response_hash?: string
+          sender_phone?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "communication_sms_responses_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "communication_sms_responses_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "communication_sms_responses_communication_event_id_fkey"
+            columns: ["communication_event_id"]
+            isOneToOne: false
+            referencedRelation: "communication_escalations"
             referencedColumns: ["id"]
           },
         ]
@@ -964,6 +1025,14 @@ export type Database = {
       normalize_phone: { Args: { p_phone: string }; Returns: string }
       process_mock_parent_action: {
         Args: { p_action: string; p_appointment_id: string; p_note?: string }
+        Returns: Json
+      }
+      process_parent_sms_response: {
+        Args: {
+          p_message: string
+          p_response_token: string
+          p_sender_phone: string
+        }
         Returns: Json
       }
       start_appointment_communication_workflow: {
