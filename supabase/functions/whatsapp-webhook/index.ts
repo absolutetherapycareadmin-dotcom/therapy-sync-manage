@@ -1,10 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const supabase = createClient(
-  Deno.env.get("SUPABASE_URL") ?? "",
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-);
+const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
 
 async function hmacSha256Hex(secret: string, payload: string) {
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
@@ -55,29 +52,28 @@ serve(async (req) => {
             .select("id,clinic_id")
             .eq("provider_message_id", providerMessageId)
             .maybeSingle();
-
-          // Never create an audit record for a provider id that the application did not send.
           if (!message?.id || !message.clinic_id) continue;
 
           await supabase.from("whatsapp_provider_events").upsert(
-            {
-              clinic_id: message.clinic_id,
-              provider_message_id: providerMessageId,
-              event_type: eventType,
-              payload: status,
-              signature_valid: true,
-            },
+            { clinic_id: message.clinic_id, provider_message_id: providerMessageId, event_type: eventType, payload: status, signature_valid: true },
             { onConflict: "provider_message_id,event_type" },
           );
 
+          const providerTimestamp = Number(status?.timestamp);
+          const timestamp = Number.isFinite(providerTimestamp) && providerTimestamp > 0 ? new Date(providerTimestamp * 1000).toISOString() : null;
           const update: Record<string, unknown> = { provider_status: eventType };
-          if (eventType === "delivered") update.delivered_at = new Date().toISOString();
-          if (eventType === "read") update.read_at = new Date().toISOString();
-          await supabase
-            .from("whatsapp_messages")
-            .update(update)
-            .eq("id", message.id)
-            .eq("clinic_id", message.clinic_id);
+          if (eventType === "sent" && timestamp) update.sent_at = timestamp;
+          if (eventType === "delivered" && timestamp) update.delivered_at = timestamp;
+          if (eventType === "read" && timestamp) update.read_at = timestamp;
+          if (eventType === "failed") update.error_message = String(status?.errors?.[0]?.title ?? status?.errors?.[0]?.message ?? "WhatsApp provider reported failure");
+          await supabase.from("whatsapp_messages").update(update).eq("id", message.id).eq("clinic_id", message.clinic_id);
+        }
+
+        for (const incoming of Array.isArray(value?.messages) ? value.messages : []) {
+          const senderPhone = incoming?.from;
+          const text = incoming?.text?.body;
+          if (!senderPhone || typeof text !== "string" || !text.trim()) continue;
+          await supabase.rpc("process_parent_whatsapp_response", { p_sender_phone: String(senderPhone), p_message: text });
         }
       }
     }
