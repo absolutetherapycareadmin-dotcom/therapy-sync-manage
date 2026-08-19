@@ -38,13 +38,10 @@ serve(async (req) => {
     let whatsappMessageId: string | null = messageId ?? null;
     let storedMessage: string | null = null;
     let storedPhone: string | null = null;
+    let appointmentMessage = false;
 
     if (communicationEventId) {
-      const { data: event } = await userClient
-        .from("communication_escalations")
-        .select("id,clinic_id,appointment_id,status")
-        .eq("id", communicationEventId)
-        .maybeSingle();
+      const { data: event } = await userClient.from("communication_escalations").select("id,clinic_id,appointment_id,status").eq("id", communicationEventId).maybeSingle();
       if (!event) return Response.json({ error: "Communication event not found or not accessible" }, { status: 404 });
       if (!["waiting_whatsapp", "waiting_sms", "waiting_call"].includes(event.status)) return Response.json({ error: "Communication event is no longer active" }, { status: 409 });
       clinicId = event.clinic_id;
@@ -52,31 +49,24 @@ serve(async (req) => {
       const { data: appointment } = await userClient.from("appointments").select("id,status").eq("id", event.appointment_id).maybeSingle();
       if (!appointment || appointment.status === "cancelled") return Response.json({ error: "Appointment is cancelled or unavailable" }, { status: 409 });
 
-      const { data: messageRow } = await userClient
-        .from("whatsapp_messages")
-        .select("id,clinic_id,phone,message,recipient_role,status")
-        .eq("communication_event_id", communicationEventId)
-        .eq("recipient_role", "parent")
-        .maybeSingle();
+      const { data: messageRow } = await userClient.from("whatsapp_messages").select("id,clinic_id,phone,message,recipient_role,status,scheduled_for,appointment_id").eq("communication_event_id", communicationEventId).eq("recipient_role", "parent").maybeSingle();
       if (!messageRow) return Response.json({ error: "Parent WhatsApp message not found" }, { status: 404 });
-      if (messageRow.clinic_id !== clinicId || messageRow.recipient_role !== "parent") return Response.json({ error: "Message is outside the authorized centre" }, { status: 403 });
+      if (messageRow.clinic_id !== clinicId) return Response.json({ error: "Message is outside the authorized centre" }, { status: 403 });
+      if (new Date(messageRow.scheduled_for).getTime() > Date.now()) return Response.json({ error: "Appointment WhatsApp notification is not due yet" }, { status: 409 });
       whatsappMessageId = messageRow.id;
       storedMessage = messageRow.message;
       storedPhone = messageRow.phone;
+      appointmentMessage = !!messageRow.appointment_id;
     } else {
-      const { data: messageRow } = await userClient
-        .from("whatsapp_messages")
-        .select("id,clinic_id,appointment_id,phone,message,recipient_role,status")
-        .eq("id", messageId)
-        .maybeSingle();
+      const { data: messageRow } = await userClient.from("whatsapp_messages").select("id,clinic_id,appointment_id,phone,message,recipient_role,status,scheduled_for").eq("id", messageId).maybeSingle();
       if (!messageRow) return Response.json({ error: "WhatsApp message not found or not accessible" }, { status: 404 });
-      if (messageRow.recipient_role !== "parent" || messageRow.appointment_id) {
-        if (messageRow.recipient_role !== "parent") return Response.json({ error: "Only parent WhatsApp messages may use this endpoint" }, { status: 403 });
-      }
+      if (messageRow.recipient_role !== "parent") return Response.json({ error: "Only parent WhatsApp messages may use this endpoint" }, { status: 403 });
       clinicId = messageRow.clinic_id;
       whatsappMessageId = messageRow.id;
       storedMessage = messageRow.message;
       storedPhone = messageRow.phone;
+      appointmentMessage = !!messageRow.appointment_id;
+      if (appointmentMessage && new Date(messageRow.scheduled_for).getTime() > Date.now()) return Response.json({ error: "Appointment WhatsApp notification is not due yet" }, { status: 409 });
     }
 
     const { data: clinic } = await userClient.from("clinics").select("id,whatsapp_mode").eq("id", clinicId).maybeSingle();
