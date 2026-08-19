@@ -16,7 +16,7 @@ END;
 
 UPDATE public.appointments
 SET status = 'scheduled'
-WHERE status IN ('pending', 'confirmed');
+WHERE status NOT IN ('scheduled','in_progress','completed','cancelled','no_show');
 
 ALTER TABLE public.appointments
   ALTER COLUMN parent_confirmation_status SET DEFAULT 'no_response';
