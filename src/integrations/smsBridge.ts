@@ -18,6 +18,12 @@ export interface SmsBridgePlugin {
   getActiveSubscriptions(): Promise<SmsSubscription[]>;
   getPendingInboundSms(): Promise<Array<{ id: string; senderPhone: string; message: string; receivedAt: number }>>;
   acknowledgeInboundSms(options: { id: string }): Promise<void>;
+  /** Opens the normal WhatsApp app for this chat and confirms whether the send action executed. */
+  sendWhatsApp(options: {
+    phone: string;
+    message: string;
+    timeoutMs?: number;
+  }): Promise<{ sent: boolean; reason?: string }>;
 }
 
 export const SmsBridge = registerPlugin<SmsBridgePlugin>("SmsBridge");

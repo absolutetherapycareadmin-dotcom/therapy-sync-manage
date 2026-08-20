@@ -1,13 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { CalendarDays, CalendarPlus } from "lucide-react";
+import { useMemo, useState } from "react";
+import { CalendarDays, CalendarPlus, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -45,6 +46,8 @@ import {
   type Appointment,
 } from "@/lib/queries";
 import { formatCurrency, formatDate, formatTime, todayISO } from "@/lib/format";
+import { runWhatsAppBatch, type BatchRunResult } from "@/lib/whatsappAutomation";
+import { isNativeDevice } from "@/lib/deviceComms";
 
 export const Route = createFileRoute("/_authenticated/appointments")({
   head: () => ({
@@ -106,6 +109,61 @@ function AppointmentsPage() {
   const [editing, setEditing] = useState<Appointment | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm());
   const [filter, setFilter] = useState("all");
+  const [selected, setSelected] = useState<string[]>([]);
+  const [batchProgress, setBatchProgress] = useState<string | null>(null);
+  const [batchResult, setBatchResult] = useState<BatchRunResult | null>(null);
+
+  const whatsappStatus = useQuery({
+    queryKey: ["appointment-whatsapp-status", id],
+    enabled: !!id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("appointment_whatsapp_status")
+        .select("appointment_id,whatsapp_status,event_status,parent_phone,sent_at,error_message")
+        .eq("clinic_id", id);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const waByAppointment = useMemo(() => {
+    const map = new Map<string, { whatsapp_status: string | null; event_status: string | null }>();
+    for (const row of whatsappStatus.data ?? []) {
+      if (row.appointment_id) {
+        map.set(row.appointment_id, {
+          whatsapp_status: row.whatsapp_status,
+          event_status: row.event_status,
+        });
+      }
+    }
+    return map;
+  }, [whatsappStatus.data]);
+
+  const isEligible = (appointmentId: string, status: string) => {
+    if (status === "cancelled") return false;
+    const wa = waByAppointment.get(appointmentId);
+    if (!wa || !wa.whatsapp_status) return false;
+    if (wa.whatsapp_status === "sent") return false;
+    return ["waiting_whatsapp", "waiting_sms", "waiting_call"].includes(wa.event_status ?? "");
+  };
+
+  const runBatch = useMutation({
+    mutationFn: async () => {
+      if (selected.length === 0) throw new Error("Select at least one appointment");
+      return runWhatsAppBatch(selected, (done, total, label) =>
+        setBatchProgress(`Sending ${done} of ${total} — ${label}`),
+      );
+    },
+    onSuccess: (result) => {
+      setBatchResult(result);
+      setSelected([]);
+      void qc.invalidateQueries({ queryKey: ["appointment-whatsapp-status", id] });
+      void qc.invalidateQueries({ queryKey: ["appointments", id] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+    onSettled: () => setBatchProgress(null),
+  });
+
 
   const openNew = () => {
     setEditing(null);
@@ -222,6 +280,11 @@ function AppointmentsPage() {
   const noTherapists = (therapists.data ?? []).length === 0;
 
   const rows = (appointments.data ?? []).filter((a) => filter === "all" || a.status === filter);
+  const eligibleRowIds = rows.filter((a) => isEligible(a.id, a.status)).map((a) => a.id);
+  const toggleSelected = (appointmentId: string, checked: boolean) =>
+    setSelected((prev) =>
+      checked ? [...new Set([...prev, appointmentId])] : prev.filter((x) => x !== appointmentId),
+    );
   const childName = (cid: string) =>
     children.data?.find((c) => c.id === cid)?.full_name ?? "Unknown child";
   const therapistName = (tid: string | null) =>
@@ -265,6 +328,35 @@ function AppointmentsPage() {
             ))}
           </SelectContent>
         </Select>
+
+        <Button
+          variant="outline"
+          onClick={() => setSelected(eligibleRowIds)}
+          disabled={eligibleRowIds.length === 0 || runBatch.isPending}
+        >
+          Select all eligible ({eligibleRowIds.length})
+        </Button>
+        {selected.length > 0 ? (
+          <Button variant="ghost" onClick={() => setSelected([])} disabled={runBatch.isPending}>
+            Clear selection
+          </Button>
+        ) : null}
+        <Button
+          onClick={() => runBatch.mutate()}
+          disabled={selected.length === 0 || runBatch.isPending}
+        >
+          <MessageCircle className="size-4" />
+          WhatsApp ({selected.length})
+        </Button>
+        {batchProgress ? (
+          <span className="text-sm text-muted-foreground">{batchProgress}</span>
+        ) : null}
+        {!isNativeDevice() ? (
+          <span className="text-xs text-muted-foreground">
+            Run the batch from the Therapy Care Android app — automation uses the centre device's
+            normal WhatsApp.
+          </span>
+        ) : null}
       </div>
 
       {appointments.isLoading ? (
@@ -292,18 +384,35 @@ function AppointmentsPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10">
+                  <Checkbox
+                    aria-label="Select all eligible appointments"
+                    checked={eligibleRowIds.length > 0 && selected.length === eligibleRowIds.length}
+                    disabled={eligibleRowIds.length === 0 || runBatch.isPending}
+                    onCheckedChange={(v) => setSelected(v === true ? eligibleRowIds : [])}
+                  />
+                </TableHead>
                 <TableHead>Child</TableHead>
                 <TableHead>Date & time</TableHead>
                 <TableHead className="hidden md:table-cell">Therapist</TableHead>
                 <TableHead className="hidden lg:table-cell">Room</TableHead>
                 <TableHead className="hidden sm:table-cell">Fee</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="hidden md:table-cell">WhatsApp</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.map((a) => (
                 <TableRow key={a.id}>
+                  <TableCell>
+                    <Checkbox
+                      aria-label={`Select ${childName(a.child_id)} for WhatsApp`}
+                      checked={selected.includes(a.id)}
+                      disabled={!isEligible(a.id, a.status) || runBatch.isPending}
+                      onCheckedChange={(v) => toggleSelected(a.id, v === true)}
+                    />
+                  </TableCell>
                   <TableCell className="font-medium">{childName(a.child_id)}</TableCell>
                   <TableCell>
                     <span className="block text-sm">{formatDate(a.appointment_date)}</span>
@@ -320,6 +429,9 @@ function AppointmentsPage() {
                   </TableCell>
                   <TableCell>
                     <StatusBadge status={a.status} />
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    <StatusBadge status={waByAppointment.get(a.id)?.whatsapp_status ?? "none"} />
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
@@ -551,6 +663,38 @@ function AppointmentsPage() {
             <Button onClick={() => save.mutate()} disabled={save.isPending}>
               {editing ? "Save changes" : "Book appointment"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={batchResult !== null} onOpenChange={(v) => !v && setBatchResult(null)}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>WhatsApp Batch Result</DialogTitle>
+            <DialogDescription>
+              {batchResult
+                ? `${batchResult.total} appointment(s) processed — ${batchResult.sent} sent, ${batchResult.failed} failed, ${batchResult.skipped} skipped.`
+                : null}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            {(batchResult?.items ?? []).map((item) => (
+              <div
+                key={item.itemId}
+                className="flex items-start justify-between gap-3 rounded-lg border p-3"
+              >
+                <div>
+                  <p className="text-sm font-medium">{item.childName ?? "Unknown child"}</p>
+                  {item.reason ? (
+                    <p className="text-xs text-muted-foreground">{item.reason}</p>
+                  ) : null}
+                </div>
+                <StatusBadge status={item.status} />
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setBatchResult(null)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

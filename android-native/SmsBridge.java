@@ -157,6 +157,60 @@ public class SmsBridge extends Plugin {
     } catch (Exception ignored) { }
   }
 
+  /**
+   * Opens the normal WhatsApp app for this chat with the message prefilled and waits for the
+   * WhatsAppAutomationService to confirm that the Send action was actually executed.
+   * No paid API is involved; nothing is reported as sent without that confirmation.
+   */
+  @PluginMethod
+  public void sendWhatsApp(PluginCall call) {
+    String phone = call.getString("phone", "");
+    String message = call.getString("message", "");
+    long timeoutMs = call.getLong("timeoutMs", 30000L);
+    if (phone == null || phone.isBlank() || message == null || message.isBlank()) {
+      call.reject("phone and message are required");
+      return;
+    }
+    String digits = phone.replaceAll("[^0-9]", "");
+    if (digits.length() == 10) digits = "91" + digits;
+
+    if (!WhatsAppAutomationService.isEnabled(getContext())) {
+      JSObject result = new JSObject();
+      result.put("sent", false);
+      result.put("reason", "Enable Therapy Care WhatsApp automation in Android accessibility settings");
+      call.resolve(result);
+      return;
+    }
+
+    final String target = digits;
+    final String body = message;
+    new Thread(() -> {
+      try {
+        long token = WhatsAppAutomationService.beginSend(target);
+        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(
+          "https://wa.me/" + target + "?text=" + Uri.encode(body)));
+        intent.setPackage("com.whatsapp");
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+          getContext().startActivity(intent);
+        } catch (Exception notInstalled) {
+          intent.setPackage("com.whatsapp.w4b");
+          getContext().startActivity(intent);
+        }
+        boolean confirmed = WhatsAppAutomationService.awaitConfirmation(token, timeoutMs);
+        JSObject result = new JSObject();
+        result.put("sent", confirmed);
+        if (!confirmed) result.put("reason", "WhatsApp did not confirm the send action in time");
+        call.resolve(result);
+      } catch (Exception e) {
+        JSObject result = new JSObject();
+        result.put("sent", false);
+        result.put("reason", "WhatsApp automation failed: " + e.getMessage());
+        call.resolve(result);
+      }
+    }).start();
+  }
+
   private void sendNow(String phone, String message, long subscriptionId, PluginCall call) {
     if (phone.isBlank() || message.isBlank()) { call.reject("phone and message are required"); return; }
     if (getContext().checkSelfPermission(Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) { requestPermissionForAlias("sms", call, "smsPermission"); return; }
