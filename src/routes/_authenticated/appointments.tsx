@@ -323,6 +323,35 @@ function AppointmentsPage() {
             ))}
           </SelectContent>
         </Select>
+
+        <Button
+          variant="outline"
+          onClick={() => setSelected(eligibleRowIds)}
+          disabled={eligibleRowIds.length === 0 || runBatch.isPending}
+        >
+          Select all eligible ({eligibleRowIds.length})
+        </Button>
+        {selected.length > 0 ? (
+          <Button variant="ghost" onClick={() => setSelected([])} disabled={runBatch.isPending}>
+            Clear selection
+          </Button>
+        ) : null}
+        <Button
+          onClick={() => runBatch.mutate()}
+          disabled={selected.length === 0 || runBatch.isPending}
+        >
+          <MessageCircle className="size-4" />
+          WhatsApp ({selected.length})
+        </Button>
+        {batchProgress ? (
+          <span className="text-sm text-muted-foreground">{batchProgress}</span>
+        ) : null}
+        {!isNativeDevice() ? (
+          <span className="text-xs text-muted-foreground">
+            Run the batch from the Therapy Care Android app — automation uses the centre device's
+            normal WhatsApp.
+          </span>
+        ) : null}
       </div>
 
       {appointments.isLoading ? (
