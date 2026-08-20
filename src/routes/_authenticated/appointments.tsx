@@ -46,6 +46,8 @@ import {
   type Appointment,
 } from "@/lib/queries";
 import { formatCurrency, formatDate, formatTime, todayISO } from "@/lib/format";
+import { runWhatsAppBatch, type BatchRunResult } from "@/lib/whatsappAutomation";
+import { isNativeDevice } from "@/lib/deviceComms";
 
 export const Route = createFileRoute("/_authenticated/appointments")({
   head: () => ({
