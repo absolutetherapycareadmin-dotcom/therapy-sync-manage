@@ -109,6 +109,61 @@ function AppointmentsPage() {
   const [editing, setEditing] = useState<Appointment | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm());
   const [filter, setFilter] = useState("all");
+  const [selected, setSelected] = useState<string[]>([]);
+  const [batchProgress, setBatchProgress] = useState<string | null>(null);
+  const [batchResult, setBatchResult] = useState<BatchRunResult | null>(null);
+
+  const whatsappStatus = useQuery({
+    queryKey: ["appointment-whatsapp-status", id],
+    enabled: !!id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("appointment_whatsapp_status")
+        .select("appointment_id,whatsapp_status,event_status,parent_phone,sent_at,error_message")
+        .eq("clinic_id", id);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const waByAppointment = useMemo(() => {
+    const map = new Map<string, { whatsapp_status: string | null; event_status: string | null }>();
+    for (const row of whatsappStatus.data ?? []) {
+      if (row.appointment_id) {
+        map.set(row.appointment_id, {
+          whatsapp_status: row.whatsapp_status,
+          event_status: row.event_status,
+        });
+      }
+    }
+    return map;
+  }, [whatsappStatus.data]);
+
+  const isEligible = (appointmentId: string, status: string) => {
+    if (status === "cancelled") return false;
+    const wa = waByAppointment.get(appointmentId);
+    if (!wa || !wa.whatsapp_status) return false;
+    if (wa.whatsapp_status === "sent") return false;
+    return ["waiting_whatsapp", "waiting_sms", "waiting_call"].includes(wa.event_status ?? "");
+  };
+
+  const runBatch = useMutation({
+    mutationFn: async () => {
+      if (selected.length === 0) throw new Error("Select at least one appointment");
+      return runWhatsAppBatch(selected, (done, total, label) =>
+        setBatchProgress(`Sending ${done} of ${total} — ${label}`),
+      );
+    },
+    onSuccess: (result) => {
+      setBatchResult(result);
+      setSelected([]);
+      void qc.invalidateQueries({ queryKey: ["appointment-whatsapp-status", id] });
+      void qc.invalidateQueries({ queryKey: ["appointments", id] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+    onSettled: () => setBatchProgress(null),
+  });
+
 
   const openNew = () => {
     setEditing(null);
