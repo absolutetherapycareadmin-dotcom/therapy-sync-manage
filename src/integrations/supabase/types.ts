@@ -148,6 +148,13 @@ export type Database = {
             foreignKeyName: "attendance_appointment_id_fkey"
             columns: ["appointment_id"]
             isOneToOne: false
+            referencedRelation: "appointment_whatsapp_status"
+            referencedColumns: ["appointment_id"]
+          },
+          {
+            foreignKeyName: "attendance_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
             referencedRelation: "appointments"
             referencedColumns: ["id"]
           },
@@ -221,6 +228,13 @@ export type Database = {
             foreignKeyName: "call_queue_appointment_id_fkey"
             columns: ["appointment_id"]
             isOneToOne: false
+            referencedRelation: "appointment_whatsapp_status"
+            referencedColumns: ["appointment_id"]
+          },
+          {
+            foreignKeyName: "call_queue_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
             referencedRelation: "appointments"
             referencedColumns: ["id"]
           },
@@ -230,6 +244,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clinics"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_queue_communication_event_id_fkey"
+            columns: ["communication_event_id"]
+            isOneToOne: false
+            referencedRelation: "appointment_whatsapp_status"
+            referencedColumns: ["communication_event_id"]
           },
           {
             foreignKeyName: "call_queue_communication_event_id_fkey"
@@ -452,6 +473,13 @@ export type Database = {
             foreignKeyName: "communication_escalations_appointment_id_fkey"
             columns: ["appointment_id"]
             isOneToOne: false
+            referencedRelation: "appointment_whatsapp_status"
+            referencedColumns: ["appointment_id"]
+          },
+          {
+            foreignKeyName: "communication_escalations_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
             referencedRelation: "appointments"
             referencedColumns: ["id"]
           },
@@ -503,6 +531,13 @@ export type Database = {
             foreignKeyName: "communication_sms_responses_appointment_id_fkey"
             columns: ["appointment_id"]
             isOneToOne: false
+            referencedRelation: "appointment_whatsapp_status"
+            referencedColumns: ["appointment_id"]
+          },
+          {
+            foreignKeyName: "communication_sms_responses_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
             referencedRelation: "appointments"
             referencedColumns: ["id"]
           },
@@ -512,6 +547,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clinics"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "communication_sms_responses_communication_event_id_fkey"
+            columns: ["communication_event_id"]
+            isOneToOne: false
+            referencedRelation: "appointment_whatsapp_status"
+            referencedColumns: ["communication_event_id"]
           },
           {
             foreignKeyName: "communication_sms_responses_communication_event_id_fkey"
@@ -654,6 +696,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "payments_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointment_whatsapp_status"
+            referencedColumns: ["appointment_id"]
+          },
           {
             foreignKeyName: "payments_appointment_id_fkey"
             columns: ["appointment_id"]
@@ -820,6 +869,13 @@ export type Database = {
             foreignKeyName: "sms_queue_appointment_id_fkey"
             columns: ["appointment_id"]
             isOneToOne: false
+            referencedRelation: "appointment_whatsapp_status"
+            referencedColumns: ["appointment_id"]
+          },
+          {
+            foreignKeyName: "sms_queue_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
             referencedRelation: "appointments"
             referencedColumns: ["id"]
           },
@@ -829,6 +885,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clinics"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_queue_communication_event_id_fkey"
+            columns: ["communication_event_id"]
+            isOneToOne: false
+            referencedRelation: "appointment_whatsapp_status"
+            referencedColumns: ["communication_event_id"]
           },
           {
             foreignKeyName: "sms_queue_communication_event_id_fkey"
@@ -927,6 +990,167 @@ export type Database = {
           },
         ]
       }
+      whatsapp_automation_batches: {
+        Row: {
+          clinic_id: string
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          status: string
+          total_selected: number
+          updated_at: string
+        }
+        Insert: {
+          clinic_id: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          status?: string
+          total_selected?: number
+          updated_at?: string
+        }
+        Update: {
+          clinic_id?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          status?: string
+          total_selected?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_automation_batches_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_automation_items: {
+        Row: {
+          appointment_date: string | null
+          appointment_id: string | null
+          batch_id: string
+          child_name: string | null
+          clinic_id: string
+          communication_event_id: string | null
+          created_at: string
+          id: string
+          message: string | null
+          parent_name: string | null
+          phone: string | null
+          position: number
+          processed_at: string | null
+          reason: string | null
+          start_time: string | null
+          status: string
+          updated_at: string
+          whatsapp_message_id: string | null
+        }
+        Insert: {
+          appointment_date?: string | null
+          appointment_id?: string | null
+          batch_id: string
+          child_name?: string | null
+          clinic_id: string
+          communication_event_id?: string | null
+          created_at?: string
+          id?: string
+          message?: string | null
+          parent_name?: string | null
+          phone?: string | null
+          position?: number
+          processed_at?: string | null
+          reason?: string | null
+          start_time?: string | null
+          status?: string
+          updated_at?: string
+          whatsapp_message_id?: string | null
+        }
+        Update: {
+          appointment_date?: string | null
+          appointment_id?: string | null
+          batch_id?: string
+          child_name?: string | null
+          clinic_id?: string
+          communication_event_id?: string | null
+          created_at?: string
+          id?: string
+          message?: string | null
+          parent_name?: string | null
+          phone?: string | null
+          position?: number
+          processed_at?: string | null
+          reason?: string | null
+          start_time?: string | null
+          status?: string
+          updated_at?: string
+          whatsapp_message_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_automation_items_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointment_whatsapp_status"
+            referencedColumns: ["appointment_id"]
+          },
+          {
+            foreignKeyName: "whatsapp_automation_items_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_automation_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_automation_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_automation_items_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_automation_items_communication_event_id_fkey"
+            columns: ["communication_event_id"]
+            isOneToOne: false
+            referencedRelation: "appointment_whatsapp_status"
+            referencedColumns: ["communication_event_id"]
+          },
+          {
+            foreignKeyName: "whatsapp_automation_items_communication_event_id_fkey"
+            columns: ["communication_event_id"]
+            isOneToOne: false
+            referencedRelation: "communication_escalations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_automation_items_whatsapp_message_id_fkey"
+            columns: ["whatsapp_message_id"]
+            isOneToOne: false
+            referencedRelation: "appointment_whatsapp_status"
+            referencedColumns: ["whatsapp_message_id"]
+          },
+          {
+            foreignKeyName: "whatsapp_automation_items_whatsapp_message_id_fkey"
+            columns: ["whatsapp_message_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_messages: {
         Row: {
           appointment_id: string | null
@@ -999,6 +1223,13 @@ export type Database = {
             foreignKeyName: "whatsapp_messages_appointment_id_fkey"
             columns: ["appointment_id"]
             isOneToOne: false
+            referencedRelation: "appointment_whatsapp_status"
+            referencedColumns: ["appointment_id"]
+          },
+          {
+            foreignKeyName: "whatsapp_messages_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
             referencedRelation: "appointments"
             referencedColumns: ["id"]
           },
@@ -1015,6 +1246,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clinics"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_messages_communication_event_id_fkey"
+            columns: ["communication_event_id"]
+            isOneToOne: false
+            referencedRelation: "appointment_whatsapp_status"
+            referencedColumns: ["communication_event_id"]
           },
           {
             foreignKeyName: "whatsapp_messages_communication_event_id_fkey"
@@ -1065,7 +1303,29 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      appointment_whatsapp_status: {
+        Row: {
+          appointment_id: string | null
+          clinic_id: string | null
+          communication_event_id: string | null
+          error_message: string | null
+          event_status: string | null
+          parent_name: string | null
+          parent_phone: string | null
+          sent_at: string | null
+          whatsapp_message_id: string | null
+          whatsapp_status: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointments_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       advance_communication_after_sms: {
@@ -1076,9 +1336,17 @@ export type Database = {
         Args: { p_escalation_id: string; p_reason?: string }
         Returns: boolean
       }
+      claim_whatsapp_automation_item: {
+        Args: { p_batch_id: string }
+        Returns: Json
+      }
       complete_communication_after_call: {
         Args: { p_dialed_at: string; p_escalation_id: string }
         Returns: boolean
+      }
+      create_whatsapp_automation_batch: {
+        Args: { p_appointment_ids: string[] }
+        Returns: string
       }
       get_communication_escalation_state: {
         Args: { p_escalation_id: string }
@@ -1101,6 +1369,14 @@ export type Database = {
           p_sender_phone: string
         }
         Returns: Json
+      }
+      record_whatsapp_automation_result: {
+        Args: { p_item_id: string; p_reason?: string; p_status: string }
+        Returns: boolean
+      }
+      release_stale_whatsapp_automation_items: {
+        Args: { p_batch_id?: string }
+        Returns: number
       }
       set_whatsapp_mode: {
         Args: { p_clinic_id: string; p_mode: string }
