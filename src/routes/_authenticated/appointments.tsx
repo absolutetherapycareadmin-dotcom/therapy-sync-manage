@@ -666,6 +666,38 @@ function AppointmentsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={batchResult !== null} onOpenChange={(v) => !v && setBatchResult(null)}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>WhatsApp Batch Result</DialogTitle>
+            <DialogDescription>
+              {batchResult
+                ? `${batchResult.total} appointment(s) processed — ${batchResult.sent} sent, ${batchResult.failed} failed, ${batchResult.skipped} skipped.`
+                : null}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            {(batchResult?.items ?? []).map((item) => (
+              <div
+                key={item.itemId}
+                className="flex items-start justify-between gap-3 rounded-lg border p-3"
+              >
+                <div>
+                  <p className="text-sm font-medium">{item.childName ?? "Unknown child"}</p>
+                  {item.reason ? (
+                    <p className="text-xs text-muted-foreground">{item.reason}</p>
+                  ) : null}
+                </div>
+                <StatusBadge status={item.status} />
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setBatchResult(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
