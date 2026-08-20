@@ -384,18 +384,35 @@ function AppointmentsPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10">
+                  <Checkbox
+                    aria-label="Select all eligible appointments"
+                    checked={eligibleRowIds.length > 0 && selected.length === eligibleRowIds.length}
+                    disabled={eligibleRowIds.length === 0 || runBatch.isPending}
+                    onCheckedChange={(v) => setSelected(v === true ? eligibleRowIds : [])}
+                  />
+                </TableHead>
                 <TableHead>Child</TableHead>
                 <TableHead>Date & time</TableHead>
                 <TableHead className="hidden md:table-cell">Therapist</TableHead>
                 <TableHead className="hidden lg:table-cell">Room</TableHead>
                 <TableHead className="hidden sm:table-cell">Fee</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="hidden md:table-cell">WhatsApp</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.map((a) => (
                 <TableRow key={a.id}>
+                  <TableCell>
+                    <Checkbox
+                      aria-label={`Select ${childName(a.child_id)} for WhatsApp`}
+                      checked={selected.includes(a.id)}
+                      disabled={!isEligible(a.id, a.status) || runBatch.isPending}
+                      onCheckedChange={(v) => toggleSelected(a.id, v === true)}
+                    />
+                  </TableCell>
                   <TableCell className="font-medium">{childName(a.child_id)}</TableCell>
                   <TableCell>
                     <span className="block text-sm">{formatDate(a.appointment_date)}</span>
