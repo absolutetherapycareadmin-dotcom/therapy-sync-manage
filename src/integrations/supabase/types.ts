@@ -348,6 +348,7 @@ export type Database = {
           updated_at: string
           whatsapp_escalation_enabled: boolean
           whatsapp_mode: string
+          whatsapp_notification_lead_minutes: number
           whatsapp_to_sms_wait_minutes: number
         }
         Insert: {
@@ -374,6 +375,7 @@ export type Database = {
           updated_at?: string
           whatsapp_escalation_enabled?: boolean
           whatsapp_mode?: string
+          whatsapp_notification_lead_minutes?: number
           whatsapp_to_sms_wait_minutes?: number
         }
         Update: {
@@ -400,6 +402,7 @@ export type Database = {
           updated_at?: string
           whatsapp_escalation_enabled?: boolean
           whatsapp_mode?: string
+          whatsapp_notification_lead_minutes?: number
           whatsapp_to_sms_wait_minutes?: number
         }
         Relationships: []
@@ -1380,6 +1383,10 @@ export type Database = {
       }
       set_whatsapp_mode: {
         Args: { p_clinic_id: string; p_mode: string }
+        Returns: boolean
+      }
+      set_whatsapp_notification_lead: {
+        Args: { p_clinic_id: string; p_lead_minutes: number }
         Returns: boolean
       }
       start_appointment_communication_workflow: {
