@@ -430,6 +430,9 @@ function AppointmentsPage() {
                   <TableCell>
                     <StatusBadge status={a.status} />
                   </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    <StatusBadge status={waByAppointment.get(a.id)?.whatsapp_status ?? "none"} />
+                  </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
                       <Button variant="ghost" size="sm" onClick={() => openEdit(a)}>
