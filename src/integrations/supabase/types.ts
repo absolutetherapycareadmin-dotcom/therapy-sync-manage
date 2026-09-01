@@ -14,6 +14,209 @@ export type Database = {
   }
   public: {
     Tables: {
+      appointment_action_tokens: {
+        Row: {
+          action: string
+          appointment_id: string
+          clinic_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          token: string
+          used_at: string | null
+        }
+        Insert: {
+          action: string
+          appointment_id: string
+          clinic_id: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          token: string
+          used_at?: string | null
+        }
+        Update: {
+          action?: string
+          appointment_id?: string
+          clinic_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          token?: string
+          used_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointment_action_tokens_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointment_whatsapp_status"
+            referencedColumns: ["appointment_id"]
+          },
+          {
+            foreignKeyName: "appointment_action_tokens_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_action_tokens_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      appointment_history: {
+        Row: {
+          actor: string
+          actor_user_id: string | null
+          appointment_id: string
+          clinic_id: string
+          created_at: string
+          details: Json
+          event: string
+          id: string
+        }
+        Insert: {
+          actor?: string
+          actor_user_id?: string | null
+          appointment_id: string
+          clinic_id: string
+          created_at?: string
+          details?: Json
+          event: string
+          id?: string
+        }
+        Update: {
+          actor?: string
+          actor_user_id?: string | null
+          appointment_id?: string
+          clinic_id?: string
+          created_at?: string
+          details?: Json
+          event?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointment_history_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointment_whatsapp_status"
+            referencedColumns: ["appointment_id"]
+          },
+          {
+            foreignKeyName: "appointment_history_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_history_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      appointment_requests: {
+        Row: {
+          admin_note: string | null
+          appointment_id: string
+          child_id: string | null
+          clinic_id: string
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          id: string
+          reason: string | null
+          request_type: string
+          requested_by: string
+          requested_date: string | null
+          requested_time: string | null
+          status: string
+          therapist_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          admin_note?: string | null
+          appointment_id: string
+          child_id?: string | null
+          clinic_id: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: string
+          reason?: string | null
+          request_type: string
+          requested_by?: string
+          requested_date?: string | null
+          requested_time?: string | null
+          status?: string
+          therapist_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          admin_note?: string | null
+          appointment_id?: string
+          child_id?: string | null
+          clinic_id?: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: string
+          reason?: string | null
+          request_type?: string
+          requested_by?: string
+          requested_date?: string | null
+          requested_time?: string | null
+          status?: string
+          therapist_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointment_requests_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointment_whatsapp_status"
+            referencedColumns: ["appointment_id"]
+          },
+          {
+            foreignKeyName: "appointment_requests_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_requests_child_id_fkey"
+            columns: ["child_id"]
+            isOneToOne: false
+            referencedRelation: "children"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_requests_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_requests_therapist_id_fkey"
+            columns: ["therapist_id"]
+            isOneToOne: false
+            referencedRelation: "therapists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       appointments: {
         Row: {
           appointment_date: string
@@ -569,41 +772,84 @@ export type Database = {
       }
       notifications: {
         Row: {
+          appointment_id: string | null
+          audience: string
           body: string | null
+          child_id: string | null
           clinic_id: string
           created_at: string
+          event: string | null
           id: string
           is_read: boolean
+          therapist_id: string | null
           title: string
           type: string
           updated_at: string
         }
         Insert: {
+          appointment_id?: string | null
+          audience?: string
           body?: string | null
+          child_id?: string | null
           clinic_id: string
           created_at?: string
+          event?: string | null
           id?: string
           is_read?: boolean
+          therapist_id?: string | null
           title: string
           type?: string
           updated_at?: string
         }
         Update: {
+          appointment_id?: string | null
+          audience?: string
           body?: string | null
+          child_id?: string | null
           clinic_id?: string
           created_at?: string
+          event?: string | null
           id?: string
           is_read?: boolean
+          therapist_id?: string | null
           title?: string
           type?: string
           updated_at?: string
         }
         Relationships: [
           {
+            foreignKeyName: "notifications_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointment_whatsapp_status"
+            referencedColumns: ["appointment_id"]
+          },
+          {
+            foreignKeyName: "notifications_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_child_id_fkey"
+            columns: ["child_id"]
+            isOneToOne: false
+            referencedRelation: "children"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "notifications_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_therapist_id_fkey"
+            columns: ["therapist_id"]
+            isOneToOne: false
+            referencedRelation: "therapists"
             referencedColumns: ["id"]
           },
         ]
@@ -993,6 +1239,38 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          clinic_id: string | null
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          clinic_id?: string | null
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          clinic_id?: string | null
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_automation_batches: {
         Row: {
           clinic_id: string
@@ -1351,18 +1629,60 @@ export type Database = {
         Args: { p_appointment_ids: string[] }
         Returns: string
       }
+      decide_appointment_request: {
+        Args: {
+          p_decision: string
+          p_new_date: string
+          p_new_time: string
+          p_note: string
+          p_request_id: string
+        }
+        Returns: Json
+      }
+      ensure_appointment_whatsapp: {
+        Args: { p_appointment_id: string; p_base_url: string }
+        Returns: Json
+      }
       get_communication_escalation_state: {
         Args: { p_escalation_id: string }
         Returns: Json
       }
+      get_parent_action_context: { Args: { p_token: string }; Returns: Json }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_centre_admin: { Args: { _user_id: string }; Returns: boolean }
       is_communication_within_working_hours: {
         Args: { p_at?: string; p_clinic_id: string }
         Returns: boolean
       }
       is_valid_phone: { Args: { p_phone: string }; Returns: boolean }
+      log_appointment_event: {
+        Args: {
+          p_actor: string
+          p_actor_user_id: string
+          p_appointment_id: string
+          p_details: Json
+          p_event: string
+        }
+        Returns: undefined
+      }
       normalize_phone: { Args: { p_phone: string }; Returns: string }
       process_mock_parent_action: {
         Args: { p_action: string; p_appointment_id: string; p_note?: string }
+        Returns: Json
+      }
+      process_parent_action_token: {
+        Args: {
+          p_new_date: string
+          p_new_time: string
+          p_reason: string
+          p_token: string
+        }
         Returns: Json
       }
       process_parent_sms_response: {
@@ -1374,7 +1694,7 @@ export type Database = {
         Returns: Json
       }
       record_whatsapp_automation_result: {
-        Args: { p_item_id: string; p_reason?: string; p_status: string }
+        Args: { p_item_id: string; p_reason: string; p_status: string }
         Returns: boolean
       }
       release_stale_whatsapp_automation_items: {
@@ -1395,7 +1715,7 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "owner" | "admin" | "therapist" | "staff"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1522,6 +1842,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["owner", "admin", "therapist", "staff"],
+    },
   },
 } as const
