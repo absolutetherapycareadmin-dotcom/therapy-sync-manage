@@ -121,6 +121,10 @@ function AppointmentsPage() {
   const [selected, setSelected] = useState<string[]>([]);
   const [batchProgress, setBatchProgress] = useState<string | null>(null);
   const [batchResult, setBatchResult] = useState<BatchRunResult | null>(null);
+  const [batchId, setBatchId] = useState<string | null>(null);
+  const [currentItem, setCurrentItem] = useState<ClaimedItem | null>(null);
+  const [itemOpened, setItemOpened] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   const whatsappStatus = useQuery({
     queryKey: ["appointment-whatsapp-status", id],
@@ -148,30 +152,98 @@ function AppointmentsPage() {
     return map;
   }, [whatsappStatus.data]);
 
-  const isEligible = (appointmentId: string, status: string) => {
-    if (status === "cancelled") return false;
-    const wa = waByAppointment.get(appointmentId);
-    if (!wa || !wa.whatsapp_status) return false;
-    if (wa.whatsapp_status === "sent") return false;
-    return ["waiting_whatsapp", "waiting_sms", "waiting_call"].includes(wa.event_status ?? "");
+  /** Honest eligibility: any live appointment whose parent has a usable phone number. */
+  const ineligibleReason = (appointmentId: string, status: string, childId: string) => {
+    if (status === "cancelled") return "Appointment is cancelled";
+    const phone = children.data?.find((c) => c.id === childId)?.parent_phone ?? "";
+    if (phone.replace(/\D/g, "").length < 8) return "Parent phone number is missing or invalid";
+    if (waByAppointment.get(appointmentId)?.whatsapp_status === "send_confirmed")
+      return "Already confirmed as sent";
+    return null;
+  };
+  const isEligible = (appointmentId: string, status: string, childId: string) =>
+    ineligibleReason(appointmentId, status, childId) === null;
+
+  const finishBatch = async (id_: string) => {
+    setCurrentItem(null);
+    setItemOpened(false);
+    setBatchId(null);
+    setBatchProgress(null);
+    setBatchResult(await fetchBatchResult(id_));
+    setSelected([]);
+    void qc.invalidateQueries({ queryKey: ["appointment-whatsapp-status", id] });
+    void qc.invalidateQueries({ queryKey: ["appointments", id] });
   };
 
-  const runBatch = useMutation({
+  const advance = async (id_: string) => {
+    const item = await claimNextItem(id_);
+    if (item.done || !item.item_id) {
+      await finishBatch(id_);
+      return;
+    }
+    setCurrentItem(item);
+    setItemOpened(false);
+  };
+
+  const startBatch = useMutation({
     mutationFn: async () => {
       if (selected.length === 0) throw new Error("Select at least one appointment");
-      return runWhatsAppBatch(selected, (done, total, label) =>
-        setBatchProgress(`Sending ${done} of ${total} — ${label}`),
-      );
+      const baseUrl = window.location.origin;
+      let done = 0;
+      for (const appointmentId of selected) {
+        done += 1;
+        setBatchProgress(`Preparing ${done} of ${selected.length}…`);
+        const prepared = await prepareAppointmentWhatsApp(appointmentId, baseUrl);
+        if (!prepared.ok && prepared.reason) toast.warning(prepared.reason);
+      }
+      setBatchProgress(null);
+      const newBatchId = await createWhatsAppBatch(selected);
+      setBatchId(newBatchId);
+      await advance(newBatchId);
     },
-    onSuccess: (result) => {
-      setBatchResult(result);
-      setSelected([]);
-      void qc.invalidateQueries({ queryKey: ["appointment-whatsapp-status", id] });
-      void qc.invalidateQueries({ queryKey: ["appointments", id] });
+    onError: (e: Error) => {
+      setBatchProgress(null);
+      toast.error(e.message);
     },
-    onError: (e: Error) => toast.error(e.message),
-    onSettled: () => setBatchProgress(null),
   });
+
+  const openCurrentChat = async () => {
+    if (!currentItem?.item_id || !batchId) return;
+    setBusy(true);
+    try {
+      const url = whatsappDeepLink(currentItem.phone ?? "", currentItem.message ?? "");
+      const popup = window.open(url, "_blank", "noopener,noreferrer");
+      if (!popup) throw new Error("WhatsApp could not be opened by this device");
+      await recordItemResult(currentItem.item_id, "opened", null);
+      setItemOpened(true);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Unable to open WhatsApp");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resolveCurrent = async (status: "confirmed" | "failed" | "skipped") => {
+    if (!currentItem?.item_id || !batchId) return;
+    setBusy(true);
+    try {
+      await recordItemResult(
+        currentItem.item_id,
+        status,
+        status === "confirmed"
+          ? null
+          : status === "skipped"
+            ? "Skipped by the centre admin"
+            : "Admin reported the message was not sent",
+      );
+      await advance(batchId);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Unable to record the result");
+    } finally {
+      setBusy(false);
+    }
+  };
+
 
 
   const openNew = () => {
