@@ -417,31 +417,30 @@ function AppointmentsPage() {
         <Button
           variant="outline"
           onClick={() => setSelected(eligibleRowIds)}
-          disabled={eligibleRowIds.length === 0 || runBatch.isPending}
+          disabled={eligibleRowIds.length === 0 || startBatch.isPending}
         >
           Select all eligible ({eligibleRowIds.length})
         </Button>
-        {selected.length > 0 ? (
-          <Button variant="ghost" onClick={() => setSelected([])} disabled={runBatch.isPending}>
+        {visibleSelected.length > 0 ? (
+          <Button variant="ghost" onClick={() => setSelected([])} disabled={startBatch.isPending}>
             Clear selection
           </Button>
         ) : null}
         <Button
-          onClick={() => runBatch.mutate()}
-          disabled={selected.length === 0 || runBatch.isPending}
+          onClick={() => startBatch.mutate()}
+          disabled={visibleSelected.length === 0 || startBatch.isPending}
         >
           <MessageCircle className="size-4" />
-          WhatsApp ({selected.length})
+          WhatsApp ({visibleSelected.length})
         </Button>
         {batchProgress ? (
           <span className="text-sm text-muted-foreground">{batchProgress}</span>
         ) : null}
-        {!isNativeDevice() ? (
-          <span className="text-xs text-muted-foreground">
-            Run the batch from the Therapy Care Android app — automation uses the centre device's
-            normal WhatsApp.
-          </span>
-        ) : null}
+        <span className="text-xs text-muted-foreground">
+          Free workflow: each chat opens in WhatsApp with the message pre-filled — you press Send,
+          then confirm here.
+        </span>
+
       </div>
 
       {appointments.isLoading ? (
