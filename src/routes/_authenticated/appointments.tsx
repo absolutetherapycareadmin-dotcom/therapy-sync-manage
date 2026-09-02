@@ -361,11 +361,15 @@ function AppointmentsPage() {
   const noTherapists = (therapists.data ?? []).length === 0;
 
   const rows = (appointments.data ?? []).filter((a) => filter === "all" || a.status === filter);
-  const eligibleRowIds = rows.filter((a) => isEligible(a.id, a.status)).map((a) => a.id);
+  const eligibleRowIds = rows
+    .filter((a) => isEligible(a.id, a.status, a.child_id))
+    .map((a) => a.id);
+  const visibleSelected = selected.filter((sid) => eligibleRowIds.includes(sid));
   const toggleSelected = (appointmentId: string, checked: boolean) =>
     setSelected((prev) =>
       checked ? [...new Set([...prev, appointmentId])] : prev.filter((x) => x !== appointmentId),
     );
+
   const childName = (cid: string) =>
     children.data?.find((c) => c.id === cid)?.full_name ?? "Unknown child";
   const therapistName = (tid: string | null) =>
