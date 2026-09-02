@@ -1,6 +1,4 @@
-import { SmsBridge } from "@/integrations/smsBridge";
 import { supabase } from "@/integrations/supabase/client";
-import { isNativeDevice, normalizePhone } from "@/lib/deviceComms";
 
 type RpcResponse<T> = { data: T; error: { message: string } | null };
 // supabase.rpc reads `this.rest` internally, so it must stay bound to the client.
@@ -8,6 +6,9 @@ const callRpc = supabase.rpc.bind(supabase) as unknown as (
   fn: string,
   args: Record<string, unknown>,
 ) => Promise<RpcResponse<unknown>>;
+
+/** Honest per-appointment states — nothing is "confirmed" until the admin says so. */
+export type ItemStatus = "queued" | "processing" | "opened" | "confirmed" | "failed" | "skipped";
 
 export type ClaimedItem = {
   done: boolean;
@@ -22,24 +23,66 @@ export type ClaimedItem = {
 export type BatchItemResult = {
   itemId: string | null;
   childName: string | null;
-  status: "sent" | "failed" | "skipped";
+  status: ItemStatus;
   reason: string | null;
 };
 
 export type BatchRunResult = {
   batchId: string;
   total: number;
-  sent: number;
+  confirmed: number;
   failed: number;
   skipped: number;
   items: BatchItemResult[];
 };
 
-function errorMessage(err: unknown) {
-  return err instanceof Error ? err.message : "WhatsApp automation error";
+export function normalizeWhatsAppPhone(phone: string) {
+  const digits = (phone ?? "").replace(/\D/g, "");
+  if (/^[6-9]\d{9}$/.test(digits)) return `91${digits}`;
+  if (/^0[6-9]\d{9}$/.test(digits)) return `91${digits.slice(-10)}`;
+  return digits;
 }
 
-async function recordResult(itemId: string, status: BatchItemResult["status"], reason: string | null) {
+export function whatsappDeepLink(phone: string, message: string) {
+  return `https://wa.me/${normalizeWhatsAppPhone(phone)}?text=${encodeURIComponent(message)}`;
+}
+
+/** Prepares (or refreshes) the parent WhatsApp message + single-use action links. */
+export async function prepareAppointmentWhatsApp(appointmentId: string, baseUrl: string) {
+  const { data, error } = await callRpc("ensure_appointment_whatsapp", {
+    p_appointment_id: appointmentId,
+    p_base_url: baseUrl,
+  });
+  if (error) throw new Error(error.message);
+  return (data ?? { ok: false, reason: "No response" }) as {
+    ok: boolean;
+    reason?: string;
+    message?: string;
+    phone?: string;
+  };
+}
+
+export async function createWhatsAppBatch(appointmentIds: string[]) {
+  const { data, error } = await callRpc("create_whatsapp_automation_batch", {
+    p_appointment_ids: appointmentIds,
+  });
+  if (error) throw new Error(error.message);
+  const batchId = data as string;
+  await callRpc("release_stale_whatsapp_automation_items", { p_batch_id: batchId });
+  return batchId;
+}
+
+export async function claimNextItem(batchId: string): Promise<ClaimedItem> {
+  const { data, error } = await callRpc("claim_whatsapp_automation_item", { p_batch_id: batchId });
+  if (error) throw new Error(error.message);
+  return (data ?? { done: true }) as ClaimedItem;
+}
+
+export async function recordItemResult(
+  itemId: string,
+  status: "opened" | "confirmed" | "failed" | "skipped",
+  reason: string | null,
+) {
   const { error } = await callRpc("record_whatsapp_automation_result", {
     p_item_id: itemId,
     p_status: status,
@@ -48,72 +91,25 @@ async function recordResult(itemId: string, status: BatchItemResult["status"], r
   if (error) throw new Error(error.message);
 }
 
-/**
- * Creates the batch server-side, then drains it one appointment at a time.
- * Each item is only marked "sent" after the Android automation confirms the
- * WhatsApp send action actually executed.
- */
-export async function runWhatsAppBatch(
-  appointmentIds: string[],
-  onProgress?: (done: number, total: number, label: string) => void,
-): Promise<BatchRunResult> {
-  const { data, error } = await callRpc("create_whatsapp_automation_batch", {
-    p_appointment_ids: appointmentIds,
-  });
-  if (error) throw new Error(error.message);
-  const batchId = data as string;
-
-  // Recover anything left mid-flight by a previous interrupted run.
-  await callRpc("release_stale_whatsapp_automation_items", { p_batch_id: batchId });
-
-  const total = appointmentIds.length;
-  let processed = 0;
-
-  for (let guard = 0; guard < total + 5; guard += 1) {
-    const claim = await callRpc("claim_whatsapp_automation_item", { p_batch_id: batchId });
-    if (claim.error) throw new Error(claim.error.message);
-    const item = (claim.data ?? { done: true }) as ClaimedItem;
-    if (item.done || !item.item_id) break;
-
-    processed += 1;
-    onProgress?.(processed, total, item.child_name ?? "Parent");
-
-    try {
-      if (!isNativeDevice()) {
-        throw new Error("Open the Therapy Care Android app to run WhatsApp automation.");
-      }
-      const outcome = await SmsBridge.sendWhatsApp({
-        phone: normalizePhone(item.phone ?? ""),
-        message: item.message ?? "",
-      });
-      if (outcome.sent) await recordResult(item.item_id, "sent", null);
-      else await recordResult(item.item_id, "failed", outcome.reason ?? "WhatsApp send was not confirmed");
-    } catch (err) {
-      await recordResult(item.item_id, "failed", errorMessage(err)).catch(() => undefined);
-    }
-  }
-
-  const { data: rows, error: rowsError } = await supabase
+export async function fetchBatchResult(batchId: string): Promise<BatchRunResult> {
+  const { data, error } = await supabase
     .from("whatsapp_automation_items")
     .select("id,child_name,status,reason,position")
     .eq("batch_id", batchId)
     .order("position", { ascending: true });
-  if (rowsError) throw rowsError;
+  if (error) throw error;
 
-  const items: BatchItemResult[] = (rows ?? []).map((r) => ({
+  const items: BatchItemResult[] = (data ?? []).map((r) => ({
     itemId: r.id,
     childName: r.child_name,
-    status: (r.status === "sent" ? "sent" : r.status === "skipped" ? "skipped" : "failed") as
-      | "sent"
-      | "failed"
-      | "skipped",
+    status: r.status as ItemStatus,
     reason: r.reason,
   }));
 
   return {
     batchId,
     total: items.length,
-    sent: items.filter((i) => i.status === "sent").length,
+    confirmed: items.filter((i) => i.status === "confirmed").length,
     failed: items.filter((i) => i.status === "failed").length,
     skipped: items.filter((i) => i.status === "skipped").length,
     items,
