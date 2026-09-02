@@ -15,8 +15,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
-import { childrenQuery, whatsappQuery } from "@/lib/queries";
-import { formatDate } from "@/lib/format";
+import { appointmentsQuery, childrenQuery, whatsappQuery } from "@/lib/queries";
+import { formatDate, formatTime } from "@/lib/format";
+
 
 export const Route = createFileRoute("/_authenticated/whatsapp")({ head: () => ({ meta: [
   { title: "WhatsApp Centre — Therapy Care" },
@@ -42,9 +43,26 @@ function WhatsappPage() {
   const qc = useQueryClient();
   const messages = useQuery({ ...whatsappQuery(id), enabled: !!id, refetchInterval: 30000 });
   const children = useQuery({ ...childrenQuery(id), enabled: !!id });
+  const appointments = useQuery({ ...appointmentsQuery(id), enabled: !!id });
   const whatsappMode = ((clinic as typeof clinic & { whatsapp_mode?: string } | null)?.whatsapp_mode ?? "free_deep_link");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ child_id: NONE, recipient_name: "", phone: "", message: "", message_type: "reminder" });
+
+  /** Pre-fills a real reminder for the selected child so the message is never empty. */
+  const buildMessage = (childId: string) => {
+    const child = children.data?.find((c) => c.id === childId);
+    if (!child) return "";
+    const today = new Date().toISOString().slice(0, 10);
+    const next = (appointments.data ?? [])
+      .filter((a) => a.child_id === childId && a.status !== "cancelled" && a.appointment_date >= today)
+      .sort((a, b) => `${a.appointment_date}${a.start_time}`.localeCompare(`${b.appointment_date}${b.start_time}`))[0];
+    const centre = clinic?.name ?? "Therapy Care";
+    if (!next) {
+      return `Hello ${child.parent_name ?? "Parent"},\n\nThis is a message from ${centre} regarding ${child.full_name}'s therapy programme.\n\nPlease contact us if you need any assistance.`;
+    }
+    return `Hello ${child.parent_name ?? "Parent"},\n\nThis is a reminder from ${centre}.\n\nChild: ${child.full_name}\nDate: ${formatDate(next.appointment_date)}\nTime: ${formatTime(next.start_time)}\n\nPlease reply here if you need to change this appointment.`;
+  };
+
 
   const send = useMutation({
     mutationFn: async () => {
@@ -105,7 +123,7 @@ function WhatsappPage() {
           return <TableRow key={m.id}><TableCell className="font-medium">{m.recipient_name ?? (m.recipient_role === "therapist" ? "Therapist" : "Parent")}<span className="block text-xs text-muted-foreground">{formatDate(m.created_at)}</span></TableCell><TableCell className="hidden sm:table-cell tabular-nums">{m.phone}</TableCell><TableCell className="max-w-[320px] truncate text-muted-foreground">{m.message}</TableCell><TableCell className="hidden md:table-cell capitalize">{m.message_type.replaceAll("_", " ")}</TableCell><TableCell className="hidden lg:table-cell text-xs">{due ? "Due now" : new Date(m.scheduled_for).toLocaleString()}</TableCell><TableCell className="text-right"><div className="flex flex-col items-end gap-2"><StatusBadge status={m.status} />{appointmentMessage && !due && (m.status === "queued" || m.status === "manual_opened") ? <span className="text-xs text-muted-foreground">Waiting for configured notification time</span> : null}{canOpenFree ? <Button variant="outline" size="sm" disabled={openAppointmentMessage.isPending} onClick={() => openAppointmentMessage.mutate({ id: m.id, phone: m.phone, message: m.message })}>Open WhatsApp</Button> : null}{appointmentMessage && due && whatsappMode === "paid_api" && m.status === "queued" ? <span className="text-xs text-muted-foreground">Automatic server send pending</span> : null}</div></TableCell></TableRow>;
         })}</TableBody></Table></div>
       )}
-      <Dialog open={open} onOpenChange={setOpen}><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>New WhatsApp message</DialogTitle><DialogDescription>{whatsappMode === "paid_api" ? "The optional paid provider runs server-side; credentials never enter the browser." : "This manual action opens WhatsApp. It does not claim the message was delivered or read."}</DialogDescription></DialogHeader><div className="space-y-4"><div className="space-y-2"><Label>Child</Label><Select value={form.child_id} onValueChange={(v) => { const child = children.data?.find((c) => c.id === v); setForm({ ...form, child_id: v, recipient_name: child?.parent_name ?? form.recipient_name, phone: child?.parent_phone ?? form.phone }); }}><SelectTrigger><SelectValue placeholder="Not linked" /></SelectTrigger><SelectContent><SelectItem value={NONE}>Not linked</SelectItem>{(children.data ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.full_name}</SelectItem>)}</SelectContent></Select></div><div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label>Recipient name</Label><Input value={form.recipient_name} maxLength={100} onChange={(e) => setForm({ ...form, recipient_name: e.target.value })} /></div><div className="space-y-2"><Label>Phone *</Label><Input value={form.phone} maxLength={20} placeholder="+9198XXXXXXXX" onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div></div><div className="space-y-2"><Label>Type</Label><Select value={form.message_type} onValueChange={(v) => setForm({ ...form, message_type: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><Label>Message *</Label><Textarea rows={4} maxLength={1000} value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} placeholder="Reminder: your child's therapy session is tomorrow at 10:00 AM." /></div></div><DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button onClick={() => send.mutate()} disabled={send.isPending}>Log & {whatsappMode === "paid_api" ? "send" : "open WhatsApp"}</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={open} onOpenChange={setOpen}><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>New WhatsApp message</DialogTitle><DialogDescription>{whatsappMode === "paid_api" ? "The optional paid provider runs server-side; credentials never enter the browser." : "This manual action opens WhatsApp. It does not claim the message was delivered or read."}</DialogDescription></DialogHeader><div className="space-y-4"><div className="space-y-2"><Label>Child</Label><Select value={form.child_id} onValueChange={(v) => { const child = children.data?.find((c) => c.id === v); const prefill = v === NONE ? "" : buildMessage(v); setForm({ ...form, child_id: v, recipient_name: child?.parent_name ?? form.recipient_name, phone: child?.parent_phone ?? form.phone, message: prefill || form.message }); }}><SelectTrigger><SelectValue placeholder="Not linked" /></SelectTrigger><SelectContent><SelectItem value={NONE}>Not linked</SelectItem>{(children.data ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.full_name}</SelectItem>)}</SelectContent></Select></div><div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label>Recipient name</Label><Input value={form.recipient_name} maxLength={100} onChange={(e) => setForm({ ...form, recipient_name: e.target.value })} /></div><div className="space-y-2"><Label>Phone *</Label><Input value={form.phone} maxLength={20} placeholder="+9198XXXXXXXX" onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div></div><div className="space-y-2"><Label>Type</Label><Select value={form.message_type} onValueChange={(v) => setForm({ ...form, message_type: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><Label>Message *</Label><Textarea rows={4} maxLength={1000} value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} placeholder="Reminder: your child's therapy session is tomorrow at 10:00 AM." /></div></div><DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button onClick={() => send.mutate()} disabled={send.isPending}>Log & {whatsappMode === "paid_api" ? "send" : "open WhatsApp"}</Button></DialogFooter></DialogContent></Dialog>
     </div>
   );
 }

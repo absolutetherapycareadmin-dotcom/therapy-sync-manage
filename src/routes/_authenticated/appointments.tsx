@@ -46,8 +46,17 @@ import {
   type Appointment,
 } from "@/lib/queries";
 import { formatCurrency, formatDate, formatTime, todayISO } from "@/lib/format";
-import { runWhatsAppBatch, type BatchRunResult } from "@/lib/whatsappAutomation";
-import { isNativeDevice } from "@/lib/deviceComms";
+import {
+  claimNextItem,
+  createWhatsAppBatch,
+  fetchBatchResult,
+  prepareAppointmentWhatsApp,
+  recordItemResult,
+  whatsappDeepLink,
+  type BatchRunResult,
+  type ClaimedItem,
+} from "@/lib/whatsappAutomation";
+
 
 export const Route = createFileRoute("/_authenticated/appointments")({
   head: () => ({
@@ -112,6 +121,10 @@ function AppointmentsPage() {
   const [selected, setSelected] = useState<string[]>([]);
   const [batchProgress, setBatchProgress] = useState<string | null>(null);
   const [batchResult, setBatchResult] = useState<BatchRunResult | null>(null);
+  const [batchId, setBatchId] = useState<string | null>(null);
+  const [currentItem, setCurrentItem] = useState<ClaimedItem | null>(null);
+  const [itemOpened, setItemOpened] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   const whatsappStatus = useQuery({
     queryKey: ["appointment-whatsapp-status", id],
@@ -139,30 +152,98 @@ function AppointmentsPage() {
     return map;
   }, [whatsappStatus.data]);
 
-  const isEligible = (appointmentId: string, status: string) => {
-    if (status === "cancelled") return false;
-    const wa = waByAppointment.get(appointmentId);
-    if (!wa || !wa.whatsapp_status) return false;
-    if (wa.whatsapp_status === "sent") return false;
-    return ["waiting_whatsapp", "waiting_sms", "waiting_call"].includes(wa.event_status ?? "");
+  /** Honest eligibility: any live appointment whose parent has a usable phone number. */
+  const ineligibleReason = (appointmentId: string, status: string, childId: string) => {
+    if (status === "cancelled") return "Appointment is cancelled";
+    const phone = children.data?.find((c) => c.id === childId)?.parent_phone ?? "";
+    if (phone.replace(/\D/g, "").length < 8) return "Parent phone number is missing or invalid";
+    if (waByAppointment.get(appointmentId)?.whatsapp_status === "send_confirmed")
+      return "Already confirmed as sent";
+    return null;
+  };
+  const isEligible = (appointmentId: string, status: string, childId: string) =>
+    ineligibleReason(appointmentId, status, childId) === null;
+
+  const finishBatch = async (id_: string) => {
+    setCurrentItem(null);
+    setItemOpened(false);
+    setBatchId(null);
+    setBatchProgress(null);
+    setBatchResult(await fetchBatchResult(id_));
+    setSelected([]);
+    void qc.invalidateQueries({ queryKey: ["appointment-whatsapp-status", id] });
+    void qc.invalidateQueries({ queryKey: ["appointments", id] });
   };
 
-  const runBatch = useMutation({
+  const advance = async (id_: string) => {
+    const item = await claimNextItem(id_);
+    if (item.done || !item.item_id) {
+      await finishBatch(id_);
+      return;
+    }
+    setCurrentItem(item);
+    setItemOpened(false);
+  };
+
+  const startBatch = useMutation({
     mutationFn: async () => {
       if (selected.length === 0) throw new Error("Select at least one appointment");
-      return runWhatsAppBatch(selected, (done, total, label) =>
-        setBatchProgress(`Sending ${done} of ${total} — ${label}`),
-      );
+      const baseUrl = window.location.origin;
+      let done = 0;
+      for (const appointmentId of selected) {
+        done += 1;
+        setBatchProgress(`Preparing ${done} of ${selected.length}…`);
+        const prepared = await prepareAppointmentWhatsApp(appointmentId, baseUrl);
+        if (!prepared.ok && prepared.reason) toast.warning(prepared.reason);
+      }
+      setBatchProgress(null);
+      const newBatchId = await createWhatsAppBatch(selected);
+      setBatchId(newBatchId);
+      await advance(newBatchId);
     },
-    onSuccess: (result) => {
-      setBatchResult(result);
-      setSelected([]);
-      void qc.invalidateQueries({ queryKey: ["appointment-whatsapp-status", id] });
-      void qc.invalidateQueries({ queryKey: ["appointments", id] });
+    onError: (e: Error) => {
+      setBatchProgress(null);
+      toast.error(e.message);
     },
-    onError: (e: Error) => toast.error(e.message),
-    onSettled: () => setBatchProgress(null),
   });
+
+  const openCurrentChat = async () => {
+    if (!currentItem?.item_id || !batchId) return;
+    setBusy(true);
+    try {
+      const url = whatsappDeepLink(currentItem.phone ?? "", currentItem.message ?? "");
+      const popup = window.open(url, "_blank", "noopener,noreferrer");
+      if (!popup) throw new Error("WhatsApp could not be opened by this device");
+      await recordItemResult(currentItem.item_id, "opened", null);
+      setItemOpened(true);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Unable to open WhatsApp");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resolveCurrent = async (status: "confirmed" | "failed" | "skipped") => {
+    if (!currentItem?.item_id || !batchId) return;
+    setBusy(true);
+    try {
+      await recordItemResult(
+        currentItem.item_id,
+        status,
+        status === "confirmed"
+          ? null
+          : status === "skipped"
+            ? "Skipped by the centre admin"
+            : "Admin reported the message was not sent",
+      );
+      await advance(batchId);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Unable to record the result");
+    } finally {
+      setBusy(false);
+    }
+  };
+
 
 
   const openNew = () => {
@@ -280,11 +361,15 @@ function AppointmentsPage() {
   const noTherapists = (therapists.data ?? []).length === 0;
 
   const rows = (appointments.data ?? []).filter((a) => filter === "all" || a.status === filter);
-  const eligibleRowIds = rows.filter((a) => isEligible(a.id, a.status)).map((a) => a.id);
+  const eligibleRowIds = rows
+    .filter((a) => isEligible(a.id, a.status, a.child_id))
+    .map((a) => a.id);
+  const visibleSelected = selected.filter((sid) => eligibleRowIds.includes(sid));
   const toggleSelected = (appointmentId: string, checked: boolean) =>
     setSelected((prev) =>
       checked ? [...new Set([...prev, appointmentId])] : prev.filter((x) => x !== appointmentId),
     );
+
   const childName = (cid: string) =>
     children.data?.find((c) => c.id === cid)?.full_name ?? "Unknown child";
   const therapistName = (tid: string | null) =>
@@ -332,31 +417,30 @@ function AppointmentsPage() {
         <Button
           variant="outline"
           onClick={() => setSelected(eligibleRowIds)}
-          disabled={eligibleRowIds.length === 0 || runBatch.isPending}
+          disabled={eligibleRowIds.length === 0 || startBatch.isPending}
         >
           Select all eligible ({eligibleRowIds.length})
         </Button>
-        {selected.length > 0 ? (
-          <Button variant="ghost" onClick={() => setSelected([])} disabled={runBatch.isPending}>
+        {visibleSelected.length > 0 ? (
+          <Button variant="ghost" onClick={() => setSelected([])} disabled={startBatch.isPending}>
             Clear selection
           </Button>
         ) : null}
         <Button
-          onClick={() => runBatch.mutate()}
-          disabled={selected.length === 0 || runBatch.isPending}
+          onClick={() => startBatch.mutate()}
+          disabled={visibleSelected.length === 0 || startBatch.isPending}
         >
           <MessageCircle className="size-4" />
-          WhatsApp ({selected.length})
+          WhatsApp ({visibleSelected.length})
         </Button>
         {batchProgress ? (
           <span className="text-sm text-muted-foreground">{batchProgress}</span>
         ) : null}
-        {!isNativeDevice() ? (
-          <span className="text-xs text-muted-foreground">
-            Run the batch from the Therapy Care Android app — automation uses the centre device's
-            normal WhatsApp.
-          </span>
-        ) : null}
+        <span className="text-xs text-muted-foreground">
+          Free workflow: each chat opens in WhatsApp with the message pre-filled — you press Send,
+          then confirm here.
+        </span>
+
       </div>
 
       {appointments.isLoading ? (
@@ -387,10 +471,14 @@ function AppointmentsPage() {
                 <TableHead className="w-10">
                   <Checkbox
                     aria-label="Select all eligible appointments"
-                    checked={eligibleRowIds.length > 0 && selected.length === eligibleRowIds.length}
-                    disabled={eligibleRowIds.length === 0 || runBatch.isPending}
+                    checked={
+                      eligibleRowIds.length > 0 &&
+                      visibleSelected.length === eligibleRowIds.length
+                    }
+                    disabled={eligibleRowIds.length === 0 || startBatch.isPending}
                     onCheckedChange={(v) => setSelected(v === true ? eligibleRowIds : [])}
                   />
+
                 </TableHead>
                 <TableHead>Child</TableHead>
                 <TableHead>Date & time</TableHead>
@@ -405,14 +493,15 @@ function AppointmentsPage() {
             <TableBody>
               {rows.map((a) => (
                 <TableRow key={a.id}>
-                  <TableCell>
+                  <TableCell title={ineligibleReason(a.id, a.status, a.child_id) ?? undefined}>
                     <Checkbox
                       aria-label={`Select ${childName(a.child_id)} for WhatsApp`}
                       checked={selected.includes(a.id)}
-                      disabled={!isEligible(a.id, a.status) || runBatch.isPending}
+                      disabled={!isEligible(a.id, a.status, a.child_id) || startBatch.isPending}
                       onCheckedChange={(v) => toggleSelected(a.id, v === true)}
                     />
                   </TableCell>
+
                   <TableCell className="font-medium">{childName(a.child_id)}</TableCell>
                   <TableCell>
                     <span className="block text-sm">{formatDate(a.appointment_date)}</span>
@@ -667,16 +756,63 @@ function AppointmentsPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={currentItem !== null} onOpenChange={() => undefined}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Sending WhatsApp — {currentItem?.child_name ?? "Parent"}</DialogTitle>
+            <DialogDescription>
+              Open the chat, press Send inside WhatsApp, then tell Therapy Care what actually
+              happened. Nothing is recorded as sent unless you confirm it.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm">
+              <span className="text-muted-foreground">To </span>
+              {currentItem?.parent_name ?? "Parent"}{" "}
+              <span className="tabular-nums text-muted-foreground">{currentItem?.phone}</span>
+            </p>
+            <pre className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded-lg border bg-muted/40 p-3 text-xs">
+              {currentItem?.message}
+            </pre>
+          </div>
+          <DialogFooter className="flex-col gap-2 sm:flex-row">
+            <Button variant="outline" disabled={busy} onClick={() => void resolveCurrent("skipped")}>
+              Skip
+            </Button>
+            {!itemOpened ? (
+              <Button disabled={busy} onClick={() => void openCurrentChat()}>
+                <MessageCircle className="size-4" />
+                Open WhatsApp
+              </Button>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => void resolveCurrent("failed")}
+                >
+                  Not sent
+                </Button>
+                <Button disabled={busy} onClick={() => void resolveCurrent("confirmed")}>
+                  I pressed Send
+                </Button>
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={batchResult !== null} onOpenChange={(v) => !v && setBatchResult(null)}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>WhatsApp Batch Result</DialogTitle>
             <DialogDescription>
               {batchResult
-                ? `${batchResult.total} appointment(s) processed — ${batchResult.sent} sent, ${batchResult.failed} failed, ${batchResult.skipped} skipped.`
+                ? `${batchResult.total} appointment(s) processed — ${batchResult.confirmed} confirmed sent, ${batchResult.failed} failed, ${batchResult.skipped} skipped.`
                 : null}
             </DialogDescription>
           </DialogHeader>
+
           <div className="space-y-2">
             {(batchResult?.items ?? []).map((item) => (
               <div

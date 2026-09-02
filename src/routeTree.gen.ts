@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
+import { Route as ParentActionRouteImport } from './routes/parent-action'
 import { Route as AuthenticatedAppointmentsRouteImport } from './routes/_authenticated/appointments'
 import { Route as AuthenticatedAttendanceRouteImport } from './routes/_authenticated/attendance'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
@@ -28,6 +29,7 @@ import { Route as AuthenticatedWhatsappRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedWhatsappProviderRouteImport } from './routes/_authenticated/whatsapp-provider'
 import { Route as AuthenticatedChildrenIndexRouteImport } from './routes/_authenticated/children.index'
 import { Route as AuthenticatedChildrenChildIdRouteImport } from './routes/_authenticated/children.$childId'
+import { Route as ApiPublicParentActionRouteImport } from './routes/api/public/parent-action'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -46,6 +48,11 @@ const AuthRoute = AuthRouteImport.update({
 const OnboardingRoute = OnboardingRouteImport.update({
   id: '/onboarding',
   path: '/onboarding',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ParentActionRoute = ParentActionRouteImport.update({
+  id: '/parent-action',
+  path: '/parent-action',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAppointmentsRoute =
@@ -129,11 +136,17 @@ const AuthenticatedChildrenChildIdRoute =
     path: '/children/$childId',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const ApiPublicParentActionRoute = ApiPublicParentActionRouteImport.update({
+  id: '/api/public/parent-action',
+  path: '/api/public/parent-action',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/onboarding': typeof OnboardingRoute
+  '/parent-action': typeof ParentActionRoute
   '/appointments': typeof AuthenticatedAppointmentsRoute
   '/attendance': typeof AuthenticatedAttendanceRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -148,12 +161,14 @@ export interface FileRoutesByFullPath {
   '/whatsapp': typeof AuthenticatedWhatsappRoute
   '/whatsapp-provider': typeof AuthenticatedWhatsappProviderRoute
   '/children/$childId': typeof AuthenticatedChildrenChildIdRoute
+  '/api/public/parent-action': typeof ApiPublicParentActionRoute
   '/children/': typeof AuthenticatedChildrenIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/onboarding': typeof OnboardingRoute
+  '/parent-action': typeof ParentActionRoute
   '/appointments': typeof AuthenticatedAppointmentsRoute
   '/attendance': typeof AuthenticatedAttendanceRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -168,6 +183,7 @@ export interface FileRoutesByTo {
   '/whatsapp': typeof AuthenticatedWhatsappRoute
   '/whatsapp-provider': typeof AuthenticatedWhatsappProviderRoute
   '/children/$childId': typeof AuthenticatedChildrenChildIdRoute
+  '/api/public/parent-action': typeof ApiPublicParentActionRoute
   '/children': typeof AuthenticatedChildrenIndexRoute
 }
 export interface FileRoutesById {
@@ -176,6 +192,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/onboarding': typeof OnboardingRoute
+  '/parent-action': typeof ParentActionRoute
   '/_authenticated/appointments': typeof AuthenticatedAppointmentsRoute
   '/_authenticated/attendance': typeof AuthenticatedAttendanceRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
@@ -190,6 +207,7 @@ export interface FileRoutesById {
   '/_authenticated/whatsapp': typeof AuthenticatedWhatsappRoute
   '/_authenticated/whatsapp-provider': typeof AuthenticatedWhatsappProviderRoute
   '/_authenticated/children/$childId': typeof AuthenticatedChildrenChildIdRoute
+  '/api/public/parent-action': typeof ApiPublicParentActionRoute
   '/_authenticated/children/': typeof AuthenticatedChildrenIndexRoute
 }
 export interface FileRouteTypes {
@@ -198,6 +216,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/onboarding'
+    | '/parent-action'
     | '/appointments'
     | '/attendance'
     | '/dashboard'
@@ -212,12 +231,14 @@ export interface FileRouteTypes {
     | '/whatsapp'
     | '/whatsapp-provider'
     | '/children/$childId'
+    | '/api/public/parent-action'
     | '/children/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/auth'
     | '/onboarding'
+    | '/parent-action'
     | '/appointments'
     | '/attendance'
     | '/dashboard'
@@ -232,6 +253,7 @@ export interface FileRouteTypes {
     | '/whatsapp'
     | '/whatsapp-provider'
     | '/children/$childId'
+    | '/api/public/parent-action'
     | '/children'
   id:
     | '__root__'
@@ -239,6 +261,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/onboarding'
+    | '/parent-action'
     | '/_authenticated/appointments'
     | '/_authenticated/attendance'
     | '/_authenticated/dashboard'
@@ -253,6 +276,7 @@ export interface FileRouteTypes {
     | '/_authenticated/whatsapp'
     | '/_authenticated/whatsapp-provider'
     | '/_authenticated/children/$childId'
+    | '/api/public/parent-action'
     | '/_authenticated/children/'
   fileRoutesById: FileRoutesById
 }
@@ -261,6 +285,8 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   OnboardingRoute: typeof OnboardingRoute
+  ParentActionRoute: typeof ParentActionRoute
+  ApiPublicParentActionRoute: typeof ApiPublicParentActionRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -291,6 +317,13 @@ declare module '@tanstack/react-router' {
       path: '/onboarding'
       fullPath: '/onboarding'
       preLoaderRoute: typeof OnboardingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/parent-action': {
+      id: '/parent-action'
+      path: '/parent-action'
+      fullPath: '/parent-action'
+      preLoaderRoute: typeof ParentActionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/appointments': {
@@ -398,6 +431,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedChildrenChildIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/parent-action': {
+      id: '/api/public/parent-action'
+      path: '/api/public/parent-action'
+      fullPath: '/api/public/parent-action'
+      preLoaderRoute: typeof ApiPublicParentActionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -445,6 +485,8 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   OnboardingRoute: OnboardingRoute,
+  ParentActionRoute: ParentActionRoute,
+  ApiPublicParentActionRoute: ApiPublicParentActionRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
