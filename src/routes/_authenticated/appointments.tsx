@@ -756,16 +756,63 @@ function AppointmentsPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={currentItem !== null} onOpenChange={() => undefined}>
+        <DialogContent className="sm:max-w-md" showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Sending WhatsApp — {currentItem?.child_name ?? "Parent"}</DialogTitle>
+            <DialogDescription>
+              Open the chat, press Send inside WhatsApp, then tell Therapy Care what actually
+              happened. Nothing is recorded as sent unless you confirm it.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm">
+              <span className="text-muted-foreground">To </span>
+              {currentItem?.parent_name ?? "Parent"}{" "}
+              <span className="tabular-nums text-muted-foreground">{currentItem?.phone}</span>
+            </p>
+            <pre className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded-lg border bg-muted/40 p-3 text-xs">
+              {currentItem?.message}
+            </pre>
+          </div>
+          <DialogFooter className="flex-col gap-2 sm:flex-row">
+            <Button variant="outline" disabled={busy} onClick={() => void resolveCurrent("skipped")}>
+              Skip
+            </Button>
+            {!itemOpened ? (
+              <Button disabled={busy} onClick={() => void openCurrentChat()}>
+                <MessageCircle className="size-4" />
+                Open WhatsApp
+              </Button>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => void resolveCurrent("failed")}
+                >
+                  Not sent
+                </Button>
+                <Button disabled={busy} onClick={() => void resolveCurrent("confirmed")}>
+                  I pressed Send
+                </Button>
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={batchResult !== null} onOpenChange={(v) => !v && setBatchResult(null)}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>WhatsApp Batch Result</DialogTitle>
             <DialogDescription>
               {batchResult
-                ? `${batchResult.total} appointment(s) processed — ${batchResult.sent} sent, ${batchResult.failed} failed, ${batchResult.skipped} skipped.`
+                ? `${batchResult.total} appointment(s) processed — ${batchResult.confirmed} confirmed sent, ${batchResult.failed} failed, ${batchResult.skipped} skipped.`
                 : null}
             </DialogDescription>
           </DialogHeader>
+
           <div className="space-y-2">
             {(batchResult?.items ?? []).map((item) => (
               <div
