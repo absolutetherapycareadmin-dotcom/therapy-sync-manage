@@ -15,8 +15,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
-import { childrenQuery, whatsappQuery } from "@/lib/queries";
-import { formatDate } from "@/lib/format";
+import { appointmentsQuery, childrenQuery, whatsappQuery } from "@/lib/queries";
+import { formatDate, formatTime } from "@/lib/format";
+
 
 export const Route = createFileRoute("/_authenticated/whatsapp")({ head: () => ({ meta: [
   { title: "WhatsApp Centre — Therapy Care" },
