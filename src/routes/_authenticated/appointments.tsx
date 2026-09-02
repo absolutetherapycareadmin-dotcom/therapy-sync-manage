@@ -493,14 +493,15 @@ function AppointmentsPage() {
             <TableBody>
               {rows.map((a) => (
                 <TableRow key={a.id}>
-                  <TableCell>
+                  <TableCell title={ineligibleReason(a.id, a.status, a.child_id) ?? undefined}>
                     <Checkbox
                       aria-label={`Select ${childName(a.child_id)} for WhatsApp`}
                       checked={selected.includes(a.id)}
-                      disabled={!isEligible(a.id, a.status) || runBatch.isPending}
+                      disabled={!isEligible(a.id, a.status, a.child_id) || startBatch.isPending}
                       onCheckedChange={(v) => toggleSelected(a.id, v === true)}
                     />
                   </TableCell>
+
                   <TableCell className="font-medium">{childName(a.child_id)}</TableCell>
                   <TableCell>
                     <span className="block text-sm">{formatDate(a.appointment_date)}</span>
