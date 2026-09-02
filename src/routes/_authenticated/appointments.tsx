@@ -471,10 +471,14 @@ function AppointmentsPage() {
                 <TableHead className="w-10">
                   <Checkbox
                     aria-label="Select all eligible appointments"
-                    checked={eligibleRowIds.length > 0 && selected.length === eligibleRowIds.length}
-                    disabled={eligibleRowIds.length === 0 || runBatch.isPending}
+                    checked={
+                      eligibleRowIds.length > 0 &&
+                      visibleSelected.length === eligibleRowIds.length
+                    }
+                    disabled={eligibleRowIds.length === 0 || startBatch.isPending}
                     onCheckedChange={(v) => setSelected(v === true ? eligibleRowIds : [])}
                   />
+
                 </TableHead>
                 <TableHead>Child</TableHead>
                 <TableHead>Date & time</TableHead>
