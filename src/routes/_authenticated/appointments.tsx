@@ -757,7 +757,7 @@ function AppointmentsPage() {
       </Dialog>
 
       <Dialog open={currentItem !== null} onOpenChange={() => undefined}>
-        <DialogContent className="sm:max-w-md" showCloseButton={false}>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Sending WhatsApp — {currentItem?.child_name ?? "Parent"}</DialogTitle>
             <DialogDescription>
