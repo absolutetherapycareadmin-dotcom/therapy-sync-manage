@@ -28,6 +28,7 @@ import { Route as AuthenticatedWhatsappRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedWhatsappProviderRouteImport } from './routes/_authenticated/whatsapp-provider'
 import { Route as AuthenticatedChildrenIndexRouteImport } from './routes/_authenticated/children.index'
 import { Route as AuthenticatedChildrenChildIdRouteImport } from './routes/_authenticated/children.$childId'
+import { Route as ApiPublicParentActionRouteImport } from './routes/api/public/parent-action'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -129,6 +130,11 @@ const AuthenticatedChildrenChildIdRoute =
     path: '/children/$childId',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const ApiPublicParentActionRoute = ApiPublicParentActionRouteImport.update({
+  id: '/api/public/parent-action',
+  path: '/api/public/parent-action',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -148,6 +154,7 @@ export interface FileRoutesByFullPath {
   '/whatsapp': typeof AuthenticatedWhatsappRoute
   '/whatsapp-provider': typeof AuthenticatedWhatsappProviderRoute
   '/children/$childId': typeof AuthenticatedChildrenChildIdRoute
+  '/api/public/parent-action': typeof ApiPublicParentActionRoute
   '/children/': typeof AuthenticatedChildrenIndexRoute
 }
 export interface FileRoutesByTo {
@@ -168,6 +175,7 @@ export interface FileRoutesByTo {
   '/whatsapp': typeof AuthenticatedWhatsappRoute
   '/whatsapp-provider': typeof AuthenticatedWhatsappProviderRoute
   '/children/$childId': typeof AuthenticatedChildrenChildIdRoute
+  '/api/public/parent-action': typeof ApiPublicParentActionRoute
   '/children': typeof AuthenticatedChildrenIndexRoute
 }
 export interface FileRoutesById {
@@ -190,6 +198,7 @@ export interface FileRoutesById {
   '/_authenticated/whatsapp': typeof AuthenticatedWhatsappRoute
   '/_authenticated/whatsapp-provider': typeof AuthenticatedWhatsappProviderRoute
   '/_authenticated/children/$childId': typeof AuthenticatedChildrenChildIdRoute
+  '/api/public/parent-action': typeof ApiPublicParentActionRoute
   '/_authenticated/children/': typeof AuthenticatedChildrenIndexRoute
 }
 export interface FileRouteTypes {
@@ -212,6 +221,7 @@ export interface FileRouteTypes {
     | '/whatsapp'
     | '/whatsapp-provider'
     | '/children/$childId'
+    | '/api/public/parent-action'
     | '/children/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -232,6 +242,7 @@ export interface FileRouteTypes {
     | '/whatsapp'
     | '/whatsapp-provider'
     | '/children/$childId'
+    | '/api/public/parent-action'
     | '/children'
   id:
     | '__root__'
@@ -253,6 +264,7 @@ export interface FileRouteTypes {
     | '/_authenticated/whatsapp'
     | '/_authenticated/whatsapp-provider'
     | '/_authenticated/children/$childId'
+    | '/api/public/parent-action'
     | '/_authenticated/children/'
   fileRoutesById: FileRoutesById
 }
@@ -261,6 +273,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   OnboardingRoute: typeof OnboardingRoute
+  ApiPublicParentActionRoute: typeof ApiPublicParentActionRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -398,6 +411,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedChildrenChildIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/parent-action': {
+      id: '/api/public/parent-action'
+      path: '/api/public/parent-action'
+      fullPath: '/api/public/parent-action'
+      preLoaderRoute: typeof ApiPublicParentActionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -445,6 +465,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   OnboardingRoute: OnboardingRoute,
+  ApiPublicParentActionRoute: ApiPublicParentActionRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

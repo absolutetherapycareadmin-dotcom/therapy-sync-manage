@@ -52,7 +52,8 @@ export const Route = createFileRoute("/api/public/parent-action")({
           p_new_date: parsed.data.new_date || null,
           p_new_time: parsed.data.new_time || null,
           p_reason: parsed.data.reason || null,
-        });
+        } as unknown as { p_token: string; p_new_date: string; p_new_time: string; p_reason: string });
+
         if (error) return json({ ok: false, reason: "This action could not be saved." }, 500);
         return json(data);
       },
