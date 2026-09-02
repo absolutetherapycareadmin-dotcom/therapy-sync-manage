@@ -43,9 +43,26 @@ function WhatsappPage() {
   const qc = useQueryClient();
   const messages = useQuery({ ...whatsappQuery(id), enabled: !!id, refetchInterval: 30000 });
   const children = useQuery({ ...childrenQuery(id), enabled: !!id });
+  const appointments = useQuery({ ...appointmentsQuery(id), enabled: !!id });
   const whatsappMode = ((clinic as typeof clinic & { whatsapp_mode?: string } | null)?.whatsapp_mode ?? "free_deep_link");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ child_id: NONE, recipient_name: "", phone: "", message: "", message_type: "reminder" });
+
+  /** Pre-fills a real reminder for the selected child so the message is never empty. */
+  const buildMessage = (childId: string) => {
+    const child = children.data?.find((c) => c.id === childId);
+    if (!child) return "";
+    const today = new Date().toISOString().slice(0, 10);
+    const next = (appointments.data ?? [])
+      .filter((a) => a.child_id === childId && a.status !== "cancelled" && a.appointment_date >= today)
+      .sort((a, b) => `${a.appointment_date}${a.start_time}`.localeCompare(`${b.appointment_date}${b.start_time}`))[0];
+    const centre = clinic?.name ?? "Therapy Care";
+    if (!next) {
+      return `Hello ${child.parent_name ?? "Parent"},\n\nThis is a message from ${centre} regarding ${child.full_name}'s therapy programme.\n\nPlease contact us if you need any assistance.`;
+    }
+    return `Hello ${child.parent_name ?? "Parent"},\n\nThis is a reminder from ${centre}.\n\nChild: ${child.full_name}\nDate: ${formatDate(next.appointment_date)}\nTime: ${formatTime(next.start_time)}\n\nPlease reply here if you need to change this appointment.`;
+  };
+
 
   const send = useMutation({
     mutationFn: async () => {
