@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
+import { Route as ParentActionRouteImport } from './routes/parent-action'
 import { Route as AuthenticatedAppointmentsRouteImport } from './routes/_authenticated/appointments'
 import { Route as AuthenticatedAttendanceRouteImport } from './routes/_authenticated/attendance'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
@@ -47,6 +48,11 @@ const AuthRoute = AuthRouteImport.update({
 const OnboardingRoute = OnboardingRouteImport.update({
   id: '/onboarding',
   path: '/onboarding',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ParentActionRoute = ParentActionRouteImport.update({
+  id: '/parent-action',
+  path: '/parent-action',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAppointmentsRoute =
@@ -140,6 +146,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/onboarding': typeof OnboardingRoute
+  '/parent-action': typeof ParentActionRoute
   '/appointments': typeof AuthenticatedAppointmentsRoute
   '/attendance': typeof AuthenticatedAttendanceRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -161,6 +168,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/onboarding': typeof OnboardingRoute
+  '/parent-action': typeof ParentActionRoute
   '/appointments': typeof AuthenticatedAppointmentsRoute
   '/attendance': typeof AuthenticatedAttendanceRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -184,6 +192,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/onboarding': typeof OnboardingRoute
+  '/parent-action': typeof ParentActionRoute
   '/_authenticated/appointments': typeof AuthenticatedAppointmentsRoute
   '/_authenticated/attendance': typeof AuthenticatedAttendanceRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
@@ -207,6 +216,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/onboarding'
+    | '/parent-action'
     | '/appointments'
     | '/attendance'
     | '/dashboard'
@@ -228,6 +238,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/onboarding'
+    | '/parent-action'
     | '/appointments'
     | '/attendance'
     | '/dashboard'
@@ -250,6 +261,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/onboarding'
+    | '/parent-action'
     | '/_authenticated/appointments'
     | '/_authenticated/attendance'
     | '/_authenticated/dashboard'
@@ -273,6 +285,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   OnboardingRoute: typeof OnboardingRoute
+  ParentActionRoute: typeof ParentActionRoute
   ApiPublicParentActionRoute: typeof ApiPublicParentActionRoute
 }
 
@@ -304,6 +317,13 @@ declare module '@tanstack/react-router' {
       path: '/onboarding'
       fullPath: '/onboarding'
       preLoaderRoute: typeof OnboardingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/parent-action': {
+      id: '/parent-action'
+      path: '/parent-action'
+      fullPath: '/parent-action'
+      preLoaderRoute: typeof ParentActionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/appointments': {
@@ -465,6 +485,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   OnboardingRoute: OnboardingRoute,
+  ParentActionRoute: ParentActionRoute,
   ApiPublicParentActionRoute: ApiPublicParentActionRoute,
 }
 export const routeTree = rootRouteImport
