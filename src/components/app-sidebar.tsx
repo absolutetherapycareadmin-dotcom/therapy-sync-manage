@@ -10,6 +10,8 @@ import {
   IndianRupee,
   MessageCircle,
   PhoneCall,
+  Inbox,
+
 
   Bell,
   BarChart3,
@@ -44,11 +46,14 @@ const groups = [
     label: "Operations",
     items: [
       { title: "Appointments", url: "/appointments", icon: CalendarDays },
+      { title: "Request Centre", url: "/requests", icon: Inbox },
       { title: "Attendance", url: "/attendance", icon: ClipboardCheck },
       { title: "Packages", url: "/packages", icon: Package },
       { title: "Payments", url: "/payments", icon: IndianRupee },
       { title: "WhatsApp Centre", url: "/whatsapp", icon: MessageCircle },
       { title: "Device SMS & Calls", url: "/device-comms", icon: PhoneCall },
+
+
 
     ],
   },
